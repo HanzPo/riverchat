@@ -158,26 +158,15 @@ const flowEdges = computed<VueFlowEdge[]>(() => {
   
   Object.values(props.nodes).forEach((node) => {
     if (node.parentId) {
-      // Check if this is a branch created from highlighted text
-      const isBranchFromText = !!node.branchMetadata;
-      
       result.push({
         id: `${node.parentId}-${node.id}`,
         source: node.parentId,
         target: node.id,
         animated: node.state === 'generating',
         style: {
-          stroke: node.state === 'generating' 
-            ? '#4a9eff' 
-            : isBranchFromText 
-              ? 'rgba(165, 214, 167, 0.6)' // Green for text branches
-              : 'rgba(255, 255, 255, 0.2)',
-          strokeWidth: isBranchFromText ? '3' : '2.5',
-          strokeDasharray: node.state === 'generating' 
-            ? '5, 5' 
-            : isBranchFromText 
-              ? '8, 4' // Dashed for branches
-              : '0',
+          stroke: node.state === 'generating' ? '#4a9eff' : 'rgba(255, 255, 255, 0.2)',
+          strokeWidth: '2.5',
+          strokeDasharray: node.state === 'generating' ? '5, 5' : '0',
         },
       });
     }

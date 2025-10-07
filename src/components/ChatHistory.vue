@@ -160,7 +160,7 @@
           :disabled="!inputText.trim() || !canSend"
           class="btn-material px-5 py-2.5 font-bold"
         >
-          {{ branchContext.text ? 'Send Branch' : 'Send' }}
+          Send
         </button>
       </div>
     </div>

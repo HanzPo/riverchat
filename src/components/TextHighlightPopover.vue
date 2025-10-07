@@ -13,7 +13,6 @@
       @mousedown.stop
       title="Create a new branch with this text as context"
     >
-      <span class="icon">🌿</span>
       <span class="label">Branch with Selection</span>
     </button>
   </div>

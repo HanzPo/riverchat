@@ -14,21 +14,12 @@
   >
     <!-- Header -->
     <div class="flex justify-between items-center mb-3 gap-2">
-      <div class="flex items-center gap-1.5">
-        <span 
-          class="text-[10.5px] font-bold px-2.5 py-1 rounded-md uppercase tracking-wider border"
-          :class="data.type === 'user' ? 'bg-primary/30 border-primary/50 text-primary' : 'bg-secondary/30 border-secondary/50 text-secondary'"
-        >
-          {{ data.type === 'user' ? '👤 USER' : '🤖 AI' }}
-        </span>
-        <span
-          v-if="data.branchMetadata"
-          class="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-accent/30 border border-accent/50 text-accent"
-          title="Branched from highlighted text"
-        >
-          🌿
-        </span>
-      </div>
+      <span 
+        class="text-[10.5px] font-bold px-2.5 py-1 rounded-md uppercase tracking-wider border"
+        :class="data.type === 'user' ? 'bg-primary/30 border-primary/50 text-primary' : 'bg-secondary/30 border-secondary/50 text-secondary'"
+      >
+        {{ data.type === 'user' ? '👤 USER' : '🤖 AI' }}
+      </span>
       <span v-if="data.model" class="text-[11px] font-medium text-white/75 overflow-hidden text-ellipsis whitespace-nowrap">
         {{ data.model.displayName }}
       </span>
