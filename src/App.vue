@@ -41,8 +41,21 @@
           @delete-branch="handleDeleteBranch"
           @update-position="handleUpdatePosition"
           @copy-message="handleCopyMessage"
+          @create-root-node="handleCreateRootNode"
+          @pane-click="handlePaneClick"
         />
-        <div v-else class="flex items-center justify-center h-full bg-background-paper">
+        
+        <!-- New Root Node Button (Floating) -->
+        <button 
+          v-if="currentRiver && !selectedNodeId && !isNewRootMode"
+          @click="handleCreateRootNode" 
+          class="absolute top-4 right-4 btn-material px-6 py-3 text-sm font-bold flex items-center gap-2 z-10 shadow-elevation-3"
+        >
+          <span class="text-lg">➕</span>
+          <span>New Root Node</span>
+        </button>
+        
+        <div v-if="!currentRiver" class="flex items-center justify-center h-full bg-background-paper">
           <div class="text-center">
             <h2 class="text-2xl font-bold text-white/95 mb-3">
               Welcome to RiverChat
@@ -58,11 +71,22 @@
       </div>
 
       <!-- Right Panel: Chat History -->
-      <div class="w-[400px] border-l border-white/15 flex flex-col card-material">
+      <div 
+        v-if="selectedNodeId || isNewRootMode" 
+        class="border-l border-white/15 flex flex-col card-material relative"
+        :style="{ width: `${chatPanelWidth}px` }"
+      >
+        <!-- Resize Handle -->
+        <div 
+          class="resize-handle"
+          @mousedown="startResize"
+        ></div>
+        
         <ChatHistory
           :path="currentPath"
           :selected-node-id="selectedNodeId"
           :last-used-model="settings.lastUsedModel"
+          :is-new-root-mode="isNewRootMode"
           @send="handleSendMessage"
           @node-select="selectNode"
         />
@@ -170,6 +194,11 @@ const showSettings = ref(false);
 const showRiverDashboard = ref(false);
 const showMessageViewer = ref(false);
 const viewingMessage = ref<MessageNode | null>(null);
+const isNewRootMode = ref(false);
+
+// Resizable chat panel
+const chatPanelWidth = ref(400);
+const isResizing = ref(false);
 
 // Confirmation dialogs
 const deleteConfirmation = ref({
@@ -195,9 +224,55 @@ const currentPath = computed(() => {
   return getPathToNode(selectedNodeId.value);
 });
 
+// Resize functionality
+function startResize(e: MouseEvent) {
+  e.preventDefault();
+  isResizing.value = true;
+  
+  // Add styles to prevent text selection and improve performance during drag
+  document.body.style.cursor = 'col-resize';
+  document.body.style.userSelect = 'none';
+  
+  const onMouseMove = (moveEvent: MouseEvent) => {
+    if (!isResizing.value) return;
+    
+    // Use requestAnimationFrame for smooth updates
+    requestAnimationFrame(() => {
+      // Calculate new width from right edge
+      const newWidth = window.innerWidth - moveEvent.clientX;
+      
+      // Clamp between min and max widths
+      chatPanelWidth.value = Math.max(300, Math.min(800, newWidth));
+    });
+  };
+  
+  const onMouseUp = () => {
+    isResizing.value = false;
+    
+    // Restore body styles
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    
+    // Save to session storage only once when done
+    sessionStorage.setItem('chatPanelWidth', chatPanelWidth.value.toString());
+    
+    document.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('mouseup', onMouseUp);
+  };
+  
+  document.addEventListener('mousemove', onMouseMove);
+  document.addEventListener('mouseup', onMouseUp);
+}
+
 // Initialize app
 onMounted(() => {
   initialize();
+  
+  // Load saved chat panel width from session storage
+  const savedWidth = sessionStorage.getItem('chatPanelWidth');
+  if (savedWidth) {
+    chatPanelWidth.value = parseInt(savedWidth, 10);
+  }
   
   // Show welcome modal if no API keys
   if (!hasAPIKeys.value) {
@@ -267,10 +342,17 @@ async function handleSendMessage(content: string, model: LLMModel) {
   }
 
   try {
-    // Get the last node in current path (or null for new conversation)
-    const parentId = currentPath.value.length > 0 
-      ? currentPath.value[currentPath.value.length - 1]?.id || null
-      : null;
+    // If in new root mode, create a new root node (parentId = null)
+    const parentId = isNewRootMode.value 
+      ? null 
+      : (currentPath.value.length > 0 
+          ? currentPath.value[currentPath.value.length - 1]?.id || null
+          : null);
+
+    // Exit new root mode
+    if (isNewRootMode.value) {
+      isNewRootMode.value = false;
+    }
 
     // Create user node
     const userNode = createUserNode(content, parentId);
@@ -377,6 +459,17 @@ function handleUpdatePosition(nodeId: string, position: { x: number; y: number }
   updateNodePosition(nodeId, position);
 }
 
+function handleCreateRootNode() {
+  // Enter new root mode - open chat window for new conversation
+  selectNode(null);
+  isNewRootMode.value = true;
+}
+
+function handlePaneClick() {
+  // Hide chat when clicking on canvas
+  isNewRootMode.value = false;
+}
+
 function handleSearch() {
   showToast('Search functionality coming soon!', 'info');
 }
@@ -421,6 +514,35 @@ function setupKeyboardShortcuts() {
 </script>
 
 <style>
+.resize-handle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: col-resize;
+  background: transparent;
+  z-index: 10;
+  transition: background-color 0.2s ease;
+  will-change: background-color;
+  touch-action: none;
+}
+
+.resize-handle:hover {
+  background: rgba(74, 158, 255, 0.3);
+}
+
+.resize-handle:active {
+  background: rgba(74, 158, 255, 0.5);
+}
+
+/* Prevent text selection during resize */
+body.resizing,
+body.resizing * {
+  user-select: none !important;
+  cursor: col-resize !important;
+}
+
 @media (max-width: 1024px) {
   .w-\[400px\] {
     width: 350px;
@@ -441,6 +563,10 @@ function setupKeyboardShortcuts() {
 
   .flex-1.relative.overflow-hidden {
     height: 60vh;
+  }
+  
+  .resize-handle {
+    display: none;
   }
 }
 </style>

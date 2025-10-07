@@ -31,7 +31,7 @@
       </div>
 
       <!-- Rivers List -->
-      <div class="flex-1 overflow-y-auto min-h-[200px]">
+      <div class="flex-1 overflow-y-auto min-h-[200px] overflow-x-visible">
         <div v-if="rivers.length === 0" class="text-center py-15 px-5 text-white/70">
           <p class="text-base mb-2 font-medium">No rivers yet</p>
           <p class="text-sm font-medium">Create your first conversation river above</p>
@@ -41,7 +41,7 @@
           <div
             v-for="river in sortedRivers"
             :key="river.id"
-            class="card-material card-material-hover p-4 cursor-pointer flex justify-between items-center"
+            class="card-material card-material-hover p-4 cursor-pointer flex justify-between items-center overflow-visible"
             @click="handleOpenRiver(river.id)"
           >
             <div class="flex-1 min-w-0">

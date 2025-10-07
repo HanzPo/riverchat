@@ -8,10 +8,15 @@ import { LLMAPIService } from '../services/llm-api';
 const currentRiver = ref<River | null>(null);
 const settings = ref<Settings>(StorageService.getSettings());
 const selectedNodeId = ref<string | null>(null);
+const riversUpdateTrigger = ref(0); // Trigger to force re-computation of rivers list
 
 export function useRiverChat() {
   // Computed
-  const allRivers = computed(() => StorageService.getRivers());
+  const allRivers = computed(() => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const _ = riversUpdateTrigger.value; // Force reactivity
+    return StorageService.getRivers();
+  });
   
   const selectedNode = computed(() => {
     if (!currentRiver.value || !selectedNodeId.value) return null;
@@ -46,6 +51,7 @@ export function useRiverChat() {
     
     StorageService.saveRiver(river);
     currentRiver.value = river;
+    riversUpdateTrigger.value++; // Trigger rivers list update
     return river;
   }
 
@@ -65,16 +71,19 @@ export function useRiverChat() {
       currentRiver.value = null;
       selectedNodeId.value = null;
     }
+    riversUpdateTrigger.value++; // Trigger rivers list update
   }
 
   function renameRiver(riverId: string, newName: string): void {
     const river = StorageService.getRiver(riverId);
     if (river) {
       river.name = newName;
+      river.lastModified = new Date().toISOString();
       StorageService.saveRiver(river);
       if (currentRiver.value?.id === riverId) {
         currentRiver.value.name = newName;
       }
+      riversUpdateTrigger.value++; // Trigger rivers list update
     }
   }
 

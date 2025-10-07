@@ -12,6 +12,7 @@
       @node-context-menu="handleNodeContextMenu"
       @node-drag-stop="handleNodeDragStop"
       @pane-click="handlePaneClick"
+      @pane-context-menu="handlePaneContextMenu"
     >
       <Background variant="lines" pattern-color="rgba(255, 255, 255, 0.12)" :gap="40" />
       <Controls />
@@ -38,37 +39,47 @@
       }"
       @click="closeContextMenu"
     >
-      <div
-        v-if="contextMenu.node?.type === 'user'"
-        class="context-menu-item"
-        @click="handleEditAndResubmit"
-      >
-        ✏️ Edit & Resubmit
-      </div>
-      
-      <div class="context-menu-item" @click="handleBranchFromHere">
-        🌿 Branch From Here
-      </div>
+      <!-- Pane Context Menu (when no node is selected) -->
+      <template v-if="!contextMenu.node">
+        <div class="context-menu-item" @click="handleCreateRootNode">
+          ➕ New Root Node
+        </div>
+      </template>
 
-      <div
-        v-if="contextMenu.node?.type === 'ai'"
-        class="context-menu-item"
-        @click="handleRegenerateResponse"
-      >
-        🔄 Regenerate Response
-      </div>
+      <!-- Node Context Menu -->
+      <template v-else>
+        <div
+          v-if="contextMenu.node?.type === 'user'"
+          class="context-menu-item"
+          @click="handleEditAndResubmit"
+        >
+          ✏️ Edit & Resubmit
+        </div>
+        
+        <div class="context-menu-item" @click="handleBranchFromHere">
+          🌿 Branch From Here
+        </div>
 
-      <div class="context-menu-item" @click="handleCopyMessage">
-        📋 Copy Message
-      </div>
+        <div
+          v-if="contextMenu.node?.type === 'ai'"
+          class="context-menu-item"
+          @click="handleRegenerateResponse"
+        >
+          🔄 Regenerate Response
+        </div>
 
-      <div class="context-menu-item" @click="handleViewFull">
-        👁️ View Full Message
-      </div>
+        <div class="context-menu-item" @click="handleCopyMessage">
+          📋 Copy Message
+        </div>
 
-      <div class="context-menu-item context-menu-item-danger" @click="handleDeleteBranch">
-        🗑️ Delete Branch
-      </div>
+        <div class="context-menu-item" @click="handleViewFull">
+          👁️ View Full Message
+        </div>
+
+        <div class="context-menu-item context-menu-item-danger" @click="handleDeleteBranch">
+          🗑️ Delete Branch
+        </div>
+      </template>
     </div>
   </div>
 </template>
@@ -103,6 +114,8 @@ interface Emits {
   (e: 'delete-branch', nodeId: string): void;
   (e: 'copy-message', content: string): void;
   (e: 'update-position', nodeId: string, position: { x: number; y: number }): void;
+  (e: 'create-root-node'): void;
+  (e: 'pane-click'): void;
 }
 
 const props = defineProps<Props>();
@@ -267,7 +280,21 @@ function handleNodeContextMenu(event: any) {
 
 function handlePaneClick() {
   emit('node-select', null);
+  emit('pane-click');
   closeContextMenu();
+}
+
+function handlePaneContextMenu(event: any) {
+  const mouseEvent = event.event || event;
+  
+  if (mouseEvent) {
+    contextMenu.value = {
+      visible: true,
+      x: mouseEvent.clientX,
+      y: mouseEvent.clientY,
+      node: null, // No node selected for pane context menu
+    };
+  }
 }
 
 function handleNodeDragStop(event: any) {
@@ -318,6 +345,10 @@ function handleViewFull() {
   if (contextMenu.value.node) {
     emit('node-double-click', contextMenu.value.node);
   }
+}
+
+function handleCreateRootNode() {
+  emit('create-root-node');
 }
 
 // Close context menu on click outside
@@ -376,9 +407,19 @@ if (typeof window !== 'undefined') {
   font-weight: 600;
 }
 
+:deep(.vue-flow__controls-button svg) {
+  fill: rgba(255, 255, 255, 0.9);
+  max-width: 16px;
+  max-height: 16px;
+}
+
 :deep(.vue-flow__controls-button:hover) {
   background: rgba(74, 158, 255, 0.15);
   color: rgba(255, 255, 255, 1);
+}
+
+:deep(.vue-flow__controls-button:hover svg) {
+  fill: rgba(255, 255, 255, 1);
 }
 
 :deep(.vue-flow__controls-button:last-child) {
