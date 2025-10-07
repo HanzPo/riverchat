@@ -13,8 +13,7 @@ const riversUpdateTrigger = ref(0); // Trigger to force re-computation of rivers
 export function useRiverChat() {
   // Computed
   const allRivers = computed(() => {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const _ = riversUpdateTrigger.value; // Force reactivity
+    void riversUpdateTrigger.value; // Force reactivity
     return StorageService.getRivers();
   });
   
