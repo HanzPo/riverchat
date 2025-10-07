@@ -1,36 +1,33 @@
 <template>
-  <div :class="themeClass" style="width: 100vw; height: 100vh; overflow: hidden;">
+  <div class="w-screen h-screen overflow-hidden bg-background">
     <!-- Top Navigation Bar -->
-    <div class="top-nav glass">
-      <div style="display: flex; align-items: center; gap: 16px;">
-        <h1 style="font-size: 20px; font-weight: 700; color: var(--text-primary);">
+    <div class="flex justify-between items-center px-5 py-3.5 border-b border-white/15 card-material">
+      <div class="flex items-center gap-4">
+        <h1 class="text-xl font-bold text-white/95">
           🌊 RiverChat
         </h1>
-        <span v-if="currentRiver" style="color: var(--text-secondary); font-size: 14px;">
+        <span v-if="currentRiver" class="text-white/75 text-sm font-medium">
           {{ currentRiver.name }}
         </span>
       </div>
 
-      <div style="display: flex; gap: 12px;">
-        <button @click="showRiverDashboard = true" class="glass-button" title="Manage Rivers">
+      <div class="flex gap-3">
+        <button @click="showRiverDashboard = true" class="btn-material" title="Manage Rivers">
           📂 Rivers
         </button>
-        <button @click="handleSearch" class="glass-button" title="Search (Ctrl+F)">
+        <button @click="handleSearch" class="btn-material" title="Search (Ctrl+F)">
           🔍
         </button>
-        <button @click="showSettings = true" class="glass-button" title="Settings">
+        <button @click="showSettings = true" class="btn-material" title="Settings">
           ⚙️
-        </button>
-        <button @click="toggleTheme" class="glass-button" title="Toggle Theme">
-          {{ settings.theme === 'dark' ? '☀️' : '🌙' }}
         </button>
       </div>
     </div>
 
     <!-- Main Content -->
-    <div class="main-content">
+    <div class="flex h-[calc(100vh-60px)]">
       <!-- Left Panel: Graph Canvas -->
-      <div class="graph-panel">
+      <div class="flex-1 relative overflow-hidden">
         <GraphCanvas
           v-if="currentRiver"
           :nodes="currentRiver.nodes"
@@ -42,17 +39,18 @@
           @regenerate="handleRegenerate"
           @edit-resubmit="handleEditResubmit"
           @delete-branch="handleDeleteBranch"
+          @update-position="handleUpdatePosition"
           @copy-message="handleCopyMessage"
         />
-        <div v-else class="empty-graph">
-          <div style="text-align: center;">
-            <h2 style="font-size: 24px; font-weight: 700; color: var(--text-primary); margin-bottom: 12px;">
+        <div v-else class="flex items-center justify-center h-full bg-background-paper">
+          <div class="text-center">
+            <h2 class="text-2xl font-bold text-white/95 mb-3">
               Welcome to RiverChat
             </h2>
-            <p style="color: var(--text-secondary); font-size: 16px; margin-bottom: 24px;">
+            <p class="text-white/75 text-base mb-6 font-medium">
               Create a new river to start your first conversation
             </p>
-            <button @click="handleCreateFirstRiver" class="glass-button" style="padding: 12px 24px; font-size: 16px;">
+            <button @click="handleCreateFirstRiver" class="btn-material px-6 py-3 text-base font-bold">
               + Create River
             </button>
           </div>
@@ -60,7 +58,7 @@
       </div>
 
       <!-- Right Panel: Chat History -->
-      <div class="chat-panel glass">
+      <div class="w-[400px] border-l border-white/15 flex flex-col card-material">
         <ChatHistory
           :path="currentPath"
           :selected-node-id="selectedNodeId"
@@ -125,14 +123,14 @@
     />
 
     <!-- Toast Notification -->
-    <div v-if="toast.visible" class="toast glass" :class="`toast-${toast.type}`">
+    <div v-if="toast.visible" class="toast" :class="`toast-${toast.type}`">
       {{ toast.message }}
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRiverChat } from './composables/useRiverChat';
 import type { MessageNode, LLMModel } from './types';
 
@@ -158,6 +156,7 @@ const {
   generateAIResponse,
   deleteNode,
   updateNodeContent,
+  updateNodePosition,
   getPathToNode,
   updateSettings,
   updateAPIKeys,
@@ -190,9 +189,6 @@ const toast = ref({
   type: 'info' as 'info' | 'success' | 'error',
 });
 
-// Theme
-const themeClass = computed(() => `${settings.value.theme}-theme`);
-
 // Current conversation path
 const currentPath = computed(() => {
   if (!selectedNodeId.value) return [];
@@ -210,11 +206,9 @@ onMounted(() => {
 
   // Setup keyboard shortcuts
   setupKeyboardShortcuts();
-});
 
-// Watch for theme changes
-watch(() => settings.value.theme, (theme) => {
-  document.body.className = `${theme}-theme`;
+  // Set dark theme on body
+  document.body.className = 'dark-theme';
 });
 
 // API Keys Management
@@ -234,11 +228,6 @@ function handleSaveSettings(newSettings: typeof settings.value) {
   updateSettings(newSettings);
   showSettings.value = false;
   showToast('Settings saved', 'success');
-}
-
-function toggleTheme() {
-  const newTheme = settings.value.theme === 'dark' ? 'light' : 'dark';
-  updateSettings({ theme: newTheme });
 }
 
 // River Management
@@ -384,6 +373,10 @@ function handleCopyMessage(content: string) {
   showToast('Message copied to clipboard', 'success');
 }
 
+function handleUpdatePosition(nodeId: string, position: { x: number; y: number }) {
+  updateNodePosition(nodeId, position);
+}
+
 function handleSearch() {
   showToast('Search functionality coming soon!', 'info');
 }
@@ -428,91 +421,25 @@ function setupKeyboardShortcuts() {
 </script>
 
 <style>
-@import './assets/glassmorphism.css';
-
-.top-nav {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 20px;
-  border-bottom: 1px solid var(--glass-border);
-  z-index: 100;
-}
-
-.main-content {
-  display: flex;
-  height: calc(100vh - 60px);
-}
-
-.graph-panel {
-  flex: 1;
-  position: relative;
-  overflow: hidden;
-}
-
-.empty-graph {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  background: var(--bg-secondary);
-}
-
-.chat-panel {
-  width: 400px;
-  border-left: 1px solid var(--glass-border);
-  display: flex;
-  flex-direction: column;
-}
-
-.toast {
-  position: fixed;
-  bottom: 24px;
-  right: 24px;
-  padding: 12px 20px;
-  border-radius: 8px;
-  z-index: 9999;
-  animation: slideUp 0.3s ease;
-  box-shadow: var(--glass-shadow);
-}
-
-.toast-info {
-  background: rgba(59, 130, 246, 0.2);
-  border: 1px solid rgba(59, 130, 246, 0.4);
-  color: var(--info-color);
-}
-
-.toast-success {
-  background: rgba(16, 185, 129, 0.2);
-  border: 1px solid rgba(16, 185, 129, 0.4);
-  color: var(--success-color);
-}
-
-.toast-error {
-  background: rgba(239, 68, 68, 0.2);
-  border: 1px solid rgba(239, 68, 68, 0.4);
-  color: var(--error-color);
-}
-
 @media (max-width: 1024px) {
-  .chat-panel {
+  .w-\[400px\] {
     width: 350px;
   }
 }
 
 @media (max-width: 768px) {
-  .main-content {
+  .flex.h-\[calc\(100vh-60px\)\] {
     flex-direction: column;
   }
 
-  .chat-panel {
+  .w-\[400px\] {
     width: 100%;
     height: 40vh;
     border-left: none;
-    border-top: 1px solid var(--glass-border);
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
   }
 
-  .graph-panel {
+  .flex-1.relative.overflow-hidden {
     height: 60vh;
   }
 }

@@ -1,31 +1,29 @@
 <template>
   <div v-if="isOpen" class="modal-backdrop" @click.self="emit('close')">
-    <div class="modal-content" style="width: 700px; max-height: 80vh; padding: 32px; display: flex; flex-direction: column;">
-      <div style="margin-bottom: 24px;">
-        <h2 style="font-size: 24px; font-weight: 700; margin-bottom: 8px; color: var(--text-primary);">
+    <div class="modal-content w-[700px] max-h-[80vh] p-8 flex flex-col">
+      <div class="mb-6">
+        <h2 class="text-2xl font-bold mb-2 text-white/95">
           Your Rivers
         </h2>
-        <p style="color: var(--text-secondary); font-size: 14px;">
+        <p class="text-white/75 text-sm font-medium">
           Manage your conversation sessions
         </p>
       </div>
 
       <!-- Create New River -->
-      <div style="margin-bottom: 20px;">
-        <div style="display: flex; gap: 12px;">
+      <div class="mb-5">
+        <div class="flex gap-3">
           <input
             v-model="newRiverName"
             type="text"
             placeholder="Enter river name..."
-            class="glass-input"
+            class="input-material flex-1"
             @keyup.enter="handleCreateRiver"
-            style="flex: 1;"
           />
           <button
             @click="handleCreateRiver"
             :disabled="!newRiverName.trim()"
-            class="glass-button"
-            style="padding: 10px 20px; white-space: nowrap;"
+            class="btn-material px-5 py-2.5 whitespace-nowrap"
           >
             + New River
           </button>
@@ -33,76 +31,48 @@
       </div>
 
       <!-- Rivers List -->
-      <div style="flex: 1; overflow-y: auto; min-height: 200px;">
-        <div v-if="rivers.length === 0" style="
-          text-align: center;
-          padding: 60px 20px;
-          color: var(--text-secondary);
-        ">
-          <p style="font-size: 16px; margin-bottom: 8px;">No rivers yet</p>
-          <p style="font-size: 14px;">Create your first conversation river above</p>
+      <div class="flex-1 overflow-y-auto min-h-[200px]">
+        <div v-if="rivers.length === 0" class="text-center py-15 px-5 text-white/70">
+          <p class="text-base mb-2 font-medium">No rivers yet</p>
+          <p class="text-sm font-medium">Create your first conversation river above</p>
         </div>
 
-        <div v-else style="display: flex; flex-direction: column; gap: 12px;">
+        <div v-else class="flex flex-col gap-3">
           <div
             v-for="river in sortedRivers"
             :key="river.id"
-            class="glass glass-hover"
-            style="
-              padding: 16px;
-              cursor: pointer;
-              display: flex;
-              justify-content: space-between;
-              align-items: center;
-            "
+            class="card-material card-material-hover p-4 cursor-pointer flex justify-between items-center"
             @click="handleOpenRiver(river.id)"
           >
-            <div style="flex: 1; min-width: 0;">
-              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
-                <h3 style="
-                  font-size: 16px;
-                  font-weight: 600;
-                  color: var(--text-primary);
-                  overflow: hidden;
-                  text-overflow: ellipsis;
-                  white-space: nowrap;
-                ">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-1.5">
+                <h3 class="text-base font-semibold text-white/95 overflow-hidden text-ellipsis whitespace-nowrap">
                   {{ river.name }}
                 </h3>
                 <span
                   v-if="river.id === activeRiverId"
-                  style="
-                    padding: 2px 8px;
-                    background: rgba(16, 185, 129, 0.2);
-                    color: var(--success-color);
-                    border-radius: 4px;
-                    font-size: 11px;
-                    font-weight: 600;
-                    text-transform: uppercase;
-                  "
+                  class="px-2 py-0.5 bg-success/25 text-success rounded-md text-[10.5px] font-bold uppercase tracking-wider border border-success/40"
                 >
                   Active
                 </span>
               </div>
-              <div style="display: flex; gap: 16px; font-size: 12px; color: var(--text-secondary);">
+              <div class="flex gap-4 text-xs text-white/70 font-medium">
                 <span>{{ formatDate(river.lastModified) }}</span>
                 <span>{{ getNodeCount(river) }} nodes</span>
               </div>
             </div>
 
-            <div style="display: flex; gap: 8px;" @click.stop>
+            <div class="flex gap-2" @click.stop>
               <button
                 @click="handleRenameRiver(river)"
-                class="glass-button"
-                style="padding: 6px 12px; font-size: 13px;"
+                class="btn-material px-3 py-1.5 text-[13px]"
                 title="Rename"
               >
                 ✏️
               </button>
               <button
                 @click="handleDeleteRiver(river)"
-                class="glass-button"
-                style="padding: 6px 12px; font-size: 13px;"
+                class="btn-material px-3 py-1.5 text-[13px]"
                 title="Delete"
               >
                 🗑️
@@ -113,8 +83,8 @@
       </div>
 
       <!-- Close Button -->
-      <div style="display: flex; justify-content: flex-end; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--glass-border);">
-        <button @click="emit('close')" class="glass-button">
+      <div class="flex justify-end mt-5 pt-5 border-t border-white/15">
+        <button @click="emit('close')" class="btn-material px-6 py-2.5">
           Close
         </button>
       </div>
@@ -227,4 +197,3 @@ function getNodeCount(river: River): number {
   return Object.keys(river.nodes).length;
 }
 </script>
-

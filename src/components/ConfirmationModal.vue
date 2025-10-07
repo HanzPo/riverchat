@@ -1,24 +1,21 @@
 <template>
   <div v-if="isOpen" class="modal-backdrop" @click.self="emit('close')">
-    <div class="modal-content" style="width: 450px; padding: 28px;">
-      <h3 style="font-size: 20px; font-weight: 700; margin-bottom: 12px; color: var(--text-primary);">
+    <div class="modal-content w-[450px] p-7">
+      <h3 class="text-xl font-bold mb-3 text-white/95">
         {{ title }}
       </h3>
-      <p style="color: var(--text-secondary); font-size: 15px; line-height: 1.6; margin-bottom: 24px;">
+      <p class="text-white/80 text-[15px] leading-relaxed mb-6 font-medium">
         {{ message }}
       </p>
 
-      <div style="display: flex; justify-content: flex-end; gap: 12px;">
-        <button @click="emit('close')" class="glass-button">
+      <div class="flex justify-end gap-3">
+        <button @click="emit('close')" class="btn-material px-5 py-2.5">
           {{ cancelText }}
         </button>
         <button
           @click="handleConfirm"
-          class="glass-button"
-          :style="{
-            background: isDangerous ? 'rgba(239, 68, 68, 0.2)' : 'rgba(102, 126, 234, 0.3)',
-            color: isDangerous ? 'var(--error-color)' : 'var(--text-primary)',
-          }"
+          class="btn-material px-5 py-2.5 font-bold"
+          :class="isDangerous ? 'bg-error/25 text-error hover:bg-error/35 border-error/40' : 'bg-primary/30 text-white/95 hover:bg-primary/40'"
         >
           {{ confirmText }}
         </button>
@@ -55,4 +52,3 @@ function handleConfirm() {
   emit('close');
 }
 </script>
-

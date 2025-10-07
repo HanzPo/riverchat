@@ -16,7 +16,6 @@ export interface APIKeys {
 
 export interface Settings {
   apiKeys: APIKeys;
-  theme: 'light' | 'dark';
   lastUsedModel: LLMModel | null;
 }
 
@@ -33,6 +32,7 @@ export interface MessageNode {
   state: NodeState;
   model?: LLMModel; // Only for AI nodes
   error?: string; // Only for error state
+  position?: { x: number; y: number }; // Node position in the canvas
 }
 
 export interface River {

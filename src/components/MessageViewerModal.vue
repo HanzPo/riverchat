@@ -1,77 +1,51 @@
 <template>
   <div v-if="isOpen && message" class="modal-backdrop" @click.self="emit('close')">
-    <div class="modal-content" style="width: 800px; max-height: 80vh; padding: 32px; overflow-y: auto;">
+    <div class="modal-content w-[800px] max-h-[80vh] p-8 overflow-y-auto">
       <!-- Header -->
-      <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 20px;">
+      <div class="flex justify-between items-start mb-5">
         <div>
-          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+          <div class="flex items-center gap-2.5 mb-2.5">
             <span
-              style="
-                padding: 4px 10px;
-                border-radius: 6px;
-                font-size: 12px;
-                font-weight: 600;
-                text-transform: uppercase;
-              "
-              :style="{
-                background: message.type === 'user' ? 'var(--user-node-bg)' : 'var(--ai-node-bg)',
-                color: 'var(--text-primary)',
-              }"
+              class="px-2.5 py-1 rounded-md text-[10.5px] font-bold uppercase tracking-wider border"
+              :class="message.type === 'user' ? 'bg-primary/30 border-primary/50 text-primary' : 'bg-secondary/30 border-secondary/50 text-secondary'"
             >
-              {{ message.type === 'user' ? 'User' : 'AI' }}
+              {{ message.type === 'user' ? 'USER' : 'AI' }}
             </span>
-            <span v-if="message.model" style="color: var(--text-secondary); font-size: 13px;">
+            <span v-if="message.model" class="text-white/75 text-[13px] font-medium">
               {{ message.model.displayName }}
             </span>
           </div>
-          <p style="color: var(--text-secondary); font-size: 13px;">
+          <p class="text-white/70 text-[13px] font-medium">
             {{ formatTimestamp(message.timestamp) }}
           </p>
         </div>
 
-        <button @click="handleCopy" class="glass-button" style="display: flex; align-items: center; gap: 6px;">
-          <span>{{ copied ? 'Copied!' : 'Copy' }}</span>
+        <button @click="handleCopy" class="btn-material flex items-center gap-1.5 px-4 py-2">
+          <span class="font-semibold">{{ copied ? 'Copied!' : 'Copy' }}</span>
         </button>
       </div>
 
       <!-- Message Content -->
-      <div style="
-        background: var(--glass-bg);
-        border: 1px solid var(--glass-border);
-        border-radius: 8px;
-        padding: 20px;
-        color: var(--text-primary);
-        white-space: pre-wrap;
-        word-wrap: break-word;
-        line-height: 1.6;
-        font-size: 15px;
-        font-family: 'Inter', sans-serif;
-      ">
+      <div class="card-material p-6 text-white/95 whitespace-pre-wrap break-words leading-relaxed text-[15px] font-sans">
         {{ message.content }}
       </div>
 
       <!-- Error State -->
       <div
         v-if="message.state === 'error' && message.error"
-        style="
-          margin-top: 16px;
-          background: rgba(239, 68, 68, 0.1);
-          border: 1px solid rgba(239, 68, 68, 0.3);
-          border-radius: 8px;
-          padding: 12px;
-        "
+        class="mt-4 bg-error/20 border border-error/40 rounded-lg p-4"
       >
-        <p style="color: var(--error-color); font-size: 13px; font-weight: 600; margin-bottom: 4px;">
+        <p class="text-error text-[13.5px] font-bold mb-1.5">
           Error:
         </p>
-        <p style="color: var(--error-color); font-size: 13px;">
+        <p class="text-error text-[13.5px] font-medium">
           {{ message.error }}
         </p>
       </div>
 
       <!-- Close Button -->
-      <div style="display: flex; justify-content: flex-end; margin-top: 20px;">
-        <button @click="emit('close')" class="glass-button">
+      <div class="flex justify-end mt-6">
+        <button @click="emit('close')" class="btn-material px-6 py-2.5">
           Close
         </button>
       </div>
@@ -112,4 +86,3 @@ function handleCopy() {
   }
 }
 </script>
-

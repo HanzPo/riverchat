@@ -1,128 +1,68 @@
 <template>
   <div v-if="isOpen" class="modal-backdrop" @click.self="emit('close')">
-    <div class="modal-content" style="width: 600px; padding: 32px;">
-      <div style="margin-bottom: 24px;">
-        <h2 style="font-size: 24px; font-weight: 700; margin-bottom: 8px; color: var(--text-primary);">
+    <div class="modal-content w-[600px] p-8">
+      <div class="mb-6">
+        <h2 class="text-2xl font-bold mb-2 text-white/95">
           Settings
         </h2>
-        <p style="color: var(--text-secondary); font-size: 14px;">
+        <p class="text-white/75 text-sm font-medium">
           Manage your API keys and preferences
         </p>
       </div>
 
-      <!-- Tabs -->
-      <div style="display: flex; gap: 12px; margin-bottom: 24px; border-bottom: 1px solid var(--glass-border); padding-bottom: 12px;">
-        <button
-          @click="activeTab = 'api'"
-          class="glass-button"
-          :style="{
-            background: activeTab === 'api' ? 'var(--glass-bg-hover)' : 'transparent',
-            border: activeTab === 'api' ? '1px solid var(--glass-border)' : '1px solid transparent',
-          }"
-        >
-          API Keys
-        </button>
-        <button
-          @click="activeTab = 'appearance'"
-          class="glass-button"
-          :style="{
-            background: activeTab === 'appearance' ? 'var(--glass-bg-hover)' : 'transparent',
-            border: activeTab === 'appearance' ? '1px solid var(--glass-border)' : '1px solid transparent',
-          }"
-        >
-          Appearance
-        </button>
-      </div>
-
-      <!-- API Keys Tab -->
-      <div v-if="activeTab === 'api'" style="display: flex; flex-direction: column; gap: 20px;">
+      <!-- API Keys -->
+      <div class="flex flex-col gap-5">
         <div>
-          <label style="display: block; margin-bottom: 8px; font-weight: 600; color: var(--text-primary);">
+          <label class="block mb-2.5 font-semibold text-white/90 text-[13.5px]">
             OpenAI API Key
           </label>
           <input
             v-model="localSettings.apiKeys.openai"
             type="password"
             placeholder="sk-..."
-            class="glass-input"
+            class="input-material"
           />
         </div>
 
         <div>
-          <label style="display: block; margin-bottom: 8px; font-weight: 600; color: var(--text-primary);">
+          <label class="block mb-2.5 font-semibold text-white/90 text-[13.5px]">
             Anthropic API Key
           </label>
           <input
             v-model="localSettings.apiKeys.anthropic"
             type="password"
             placeholder="sk-ant-..."
-            class="glass-input"
+            class="input-material"
           />
         </div>
 
         <div>
-          <label style="display: block; margin-bottom: 8px; font-weight: 600; color: var(--text-primary);">
+          <label class="block mb-2.5 font-semibold text-white/90 text-[13.5px]">
             Google Gemini API Key
           </label>
           <input
             v-model="localSettings.apiKeys.google"
             type="password"
             placeholder="AIza..."
-            class="glass-input"
+            class="input-material"
           />
         </div>
 
-        <div style="
-          background: rgba(59, 130, 246, 0.1);
-          border: 1px solid rgba(59, 130, 246, 0.3);
-          border-radius: 8px;
-          padding: 12px;
-        ">
-          <p style="font-size: 13px; color: var(--text-primary); line-height: 1.5;">
+        <div class="bg-info/15 border border-info/40 rounded-lg p-4">
+          <p class="text-[13.5px] text-white/95 leading-relaxed font-medium">
             🔒 API keys are stored locally in your browser and never sent to any server except the selected LLM provider.
           </p>
         </div>
       </div>
 
-      <!-- Appearance Tab -->
-      <div v-if="activeTab === 'appearance'" style="display: flex; flex-direction: column; gap: 20px;">
-        <div>
-          <label style="display: block; margin-bottom: 8px; font-weight: 600; color: var(--text-primary);">
-            Theme
-          </label>
-          <select v-model="localSettings.theme" class="glass-select" style="width: 100%; padding: 10px;">
-            <option value="light">Light</option>
-            <option value="dark">Dark</option>
-          </select>
-        </div>
-
-        <div style="
-          background: var(--glass-bg);
-          border: 1px solid var(--glass-border);
-          border-radius: 8px;
-          padding: 20px;
-          text-align: center;
-        ">
-          <p style="color: var(--text-secondary); font-size: 14px;">
-            Theme preview
-          </p>
-          <div style="margin-top: 12px; display: flex; gap: 8px; justify-content: center;">
-            <div class="glass" style="width: 60px; height: 60px;"></div>
-            <div class="glass" style="width: 60px; height: 60px; background: var(--user-node-bg);"></div>
-            <div class="glass" style="width: 60px; height: 60px; background: var(--ai-node-bg);"></div>
-          </div>
-        </div>
-      </div>
-
       <!-- Actions -->
-      <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--glass-border);">
-        <button @click="emit('close')" class="glass-button">
+      <div class="flex justify-end gap-3 mt-6 pt-6 border-t border-white/15">
+        <button @click="emit('close')" class="btn-material px-5 py-2.5">
           Cancel
         </button>
         <button
           @click="handleSave"
-          class="glass-button"
-          style="background: rgba(102, 126, 234, 0.3);"
+          class="btn-material bg-primary/30 hover:bg-primary/40 px-5 py-2.5 font-bold"
         >
           Save Changes
         </button>
@@ -148,7 +88,6 @@ interface Emits {
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
-const activeTab = ref<'api' | 'appearance'>('api');
 const localSettings = ref<Settings>({ ...props.settings });
 
 watch(() => props.settings, (newSettings) => {
@@ -159,4 +98,3 @@ function handleSave() {
   emit('save', localSettings.value);
 }
 </script>
-

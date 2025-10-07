@@ -1,44 +1,43 @@
 <template>
   <div
-    class="custom-node glass"
+    class="card-material p-3.5 min-w-[280px] max-w-[320px] cursor-pointer transition-all duration-300 ease-material hover:-translate-y-0.5 hover:shadow-elevation-3"
     :class="{
-      'node-generating': data.state === 'generating',
-      'node-error': data.state === 'error',
-      'node-selected': selected,
-    }"
-    :style="{
-      background: data.type === 'user' ? 'var(--user-node-bg)' : 'var(--ai-node-bg)',
-      opacity: data.state === 'generating' ? 0.7 : 1,
-      borderColor: selected ? 'rgba(102, 126, 234, 0.6)' : 'var(--glass-border)',
-      borderWidth: selected ? '2px' : '1px',
+      'animate-pulse opacity-70': data.state === 'generating',
+      'border-error border-2': data.state === 'error',
+      'shadow-[0_0_0_3px] shadow-primary/40 border-2 border-primary': selected,
+      'bg-primary/20 border-primary/30': data.type === 'user',
+      'bg-secondary/20 border-secondary/30': data.type === 'ai',
     }"
     @click="handleClick"
     @dblclick="handleDoubleClick"
     @contextmenu.prevent="handleContextMenu"
   >
     <!-- Header -->
-    <div class="node-header">
-      <span class="node-type-badge" :class="`badge-${data.type}`">
-        {{ data.type === 'user' ? '👤 User' : '🤖 AI' }}
+    <div class="flex justify-between items-center mb-3 gap-2">
+      <span 
+        class="text-[10.5px] font-bold px-2.5 py-1 rounded-md uppercase tracking-wider border"
+        :class="data.type === 'user' ? 'bg-primary/30 border-primary/50 text-primary' : 'bg-secondary/30 border-secondary/50 text-secondary'"
+      >
+        {{ data.type === 'user' ? '👤 USER' : '🤖 AI' }}
       </span>
-      <span v-if="data.model" class="node-model">
+      <span v-if="data.model" class="text-[11px] font-medium text-white/75 overflow-hidden text-ellipsis whitespace-nowrap">
         {{ data.model.displayName }}
       </span>
     </div>
 
     <!-- Content Preview -->
-    <div class="node-content">
+    <div class="text-white/95 text-[13.5px] leading-relaxed mb-3 break-words whitespace-pre-wrap font-normal">
       {{ truncateContent(data.content) }}
-      <span v-if="data.state === 'generating'" class="generating-indicator">▊</span>
+      <span v-if="data.state === 'generating'" class="inline-block animate-blink text-info font-bold">▊</span>
     </div>
 
     <!-- Error Badge -->
-    <div v-if="data.state === 'error'" class="error-badge">
+    <div v-if="data.state === 'error'" class="bg-error/25 text-error px-2.5 py-1.5 rounded-md text-xs font-semibold mb-2 text-center border border-error/40">
       ⚠️ Error
     </div>
 
     <!-- Timestamp -->
-    <div class="node-footer">
+    <div class="text-[11px] text-white/70 text-right font-medium">
       {{ formatTime(data.timestamp) }}
     </div>
   </div>
@@ -86,73 +85,6 @@ function handleContextMenu(event: MouseEvent) {
 </script>
 
 <style scoped>
-.custom-node {
-  padding: 12px;
-  min-width: 250px;
-  max-width: 300px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.custom-node:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 40px 0 rgba(31, 38, 135, 0.25);
-}
-
-.node-generating {
-  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
-.node-error {
-  border-color: var(--error-color) !important;
-}
-
-.node-selected {
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.3);
-}
-
-.node-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-  gap: 8px;
-}
-
-.node-type-badge {
-  font-size: 11px;
-  font-weight: 700;
-  padding: 3px 8px;
-  border-radius: 4px;
-  text-transform: uppercase;
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-}
-
-.node-model {
-  font-size: 11px;
-  color: var(--text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.node-content {
-  color: var(--text-primary);
-  font-size: 13px;
-  line-height: 1.5;
-  margin-bottom: 10px;
-  word-wrap: break-word;
-  white-space: pre-wrap;
-}
-
-.generating-indicator {
-  display: inline-block;
-  animation: blink 1s step-start infinite;
-  color: var(--info-color);
-  font-weight: bold;
-}
-
 @keyframes blink {
   0%, 50% {
     opacity: 1;
@@ -162,30 +94,7 @@ function handleContextMenu(event: MouseEvent) {
   }
 }
 
-.error-badge {
-  background: rgba(239, 68, 68, 0.2);
-  color: var(--error-color);
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 600;
-  margin-bottom: 8px;
-  text-align: center;
-}
-
-.node-footer {
-  font-size: 11px;
-  color: var(--text-secondary);
-  text-align: right;
-}
-
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.7;
-  }
+.animate-blink {
+  animation: blink 1s step-start infinite;
 }
 </style>
-

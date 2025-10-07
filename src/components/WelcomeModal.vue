@@ -1,98 +1,86 @@
 <template>
   <div v-if="isOpen" class="modal-backdrop" @click.self="onBackdropClick">
-    <div class="modal-content" style="width: 600px; padding: 32px;">
-      <div style="margin-bottom: 24px;">
-        <h1 style="font-size: 28px; font-weight: 700; margin-bottom: 12px; color: var(--text-primary);">
+    <div class="modal-content w-[600px] p-8">
+      <div class="mb-6">
+        <h1 class="text-[28px] font-bold mb-3 text-white/95">
           Welcome to RiverChat 🌊
         </h1>
-        <p style="color: var(--text-secondary); font-size: 16px; line-height: 1.6;">
+        <p class="text-white/80 text-base leading-relaxed font-medium">
           RiverChat is a non-linear chat application that visualizes conversations as branching rivers.
           To get started, please enter at least one API key.
         </p>
       </div>
 
-      <div style="display: flex; flex-direction: column; gap: 20px; margin-bottom: 24px;">
+      <div class="flex flex-col gap-5 mb-6">
         <!-- OpenAI -->
         <div>
-          <label style="display: block; margin-bottom: 8px; font-weight: 600; color: var(--text-primary);">
+          <label class="block mb-2.5 font-semibold text-white/90 text-[13.5px]">
             OpenAI API Key
           </label>
           <input
             v-model="apiKeys.openai"
             type="password"
             placeholder="sk-..."
-            class="glass-input"
+            class="input-material"
           />
-          <p style="font-size: 12px; color: var(--text-secondary); margin-top: 6px;">
+          <p class="text-xs text-white/70 mt-2 font-medium">
             For GPT-4o, GPT-4 Turbo, etc.
           </p>
         </div>
 
         <!-- Anthropic -->
         <div>
-          <label style="display: block; margin-bottom: 8px; font-weight: 600; color: var(--text-primary);">
+          <label class="block mb-2.5 font-semibold text-white/90 text-[13.5px]">
             Anthropic API Key
           </label>
           <input
             v-model="apiKeys.anthropic"
             type="password"
             placeholder="sk-ant-..."
-            class="glass-input"
+            class="input-material"
           />
-          <p style="font-size: 12px; color: var(--text-secondary); margin-top: 6px;">
+          <p class="text-xs text-white/70 mt-2 font-medium">
             For Claude 3.5 Sonnet, Opus, etc.
           </p>
         </div>
 
         <!-- Google -->
         <div>
-          <label style="display: block; margin-bottom: 8px; font-weight: 600; color: var(--text-primary);">
+          <label class="block mb-2.5 font-semibold text-white/90 text-[13.5px]">
             Google Gemini API Key
           </label>
           <input
             v-model="apiKeys.google"
             type="password"
             placeholder="AIza..."
-            class="glass-input"
+            class="input-material"
           />
-          <p style="font-size: 12px; color: var(--text-secondary); margin-top: 6px;">
+          <p class="text-xs text-white/70 mt-2 font-medium">
             For Gemini 2.0 Flash, Gemini 1.5 Pro, etc.
           </p>
         </div>
       </div>
 
       <!-- Security Notice -->
-      <div style="
-        background: rgba(59, 130, 246, 0.1);
-        border: 1px solid rgba(59, 130, 246, 0.3);
-        border-radius: 8px;
-        padding: 12px;
-        margin-bottom: 24px;
-      ">
-        <p style="font-size: 13px; color: var(--text-primary); line-height: 1.5;">
-          🔒 <strong>Privacy Note:</strong> Your API keys are stored securely in your browser's local storage
+      <div class="bg-info/15 border border-info/40 rounded-lg p-4 mb-6">
+        <p class="text-[13.5px] text-white/95 leading-relaxed">
+          🔒 <strong class="font-bold">Privacy Note:</strong> Your API keys are stored securely in your browser's local storage
           and are never sent to any server except the selected LLM provider.
         </p>
       </div>
 
       <!-- Actions -->
-      <div style="display: flex; justify-content: flex-end; gap: 12px;">
+      <div class="flex justify-end gap-3">
         <button
           @click="handleSave"
           :disabled="!hasAtLeastOneKey"
-          class="glass-button"
-          style="padding: 12px 24px; font-size: 16px; font-weight: 600;"
+          class="btn-material px-6 py-3 text-base font-bold"
         >
           Get Started
         </button>
       </div>
 
-      <p v-if="!hasAtLeastOneKey" style="
-        color: var(--warning-color);
-        font-size: 13px;
-        text-align: right;
-        margin-top: 8px;
-      ">
+      <p v-if="!hasAtLeastOneKey" class="text-warning text-[13px] text-right mt-2.5 font-semibold">
         Please enter at least one API key to continue
       </p>
     </div>
@@ -141,4 +129,3 @@ function onBackdropClick() {
   }
 }
 </script>
-

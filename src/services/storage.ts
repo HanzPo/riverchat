@@ -8,7 +8,6 @@ const DEFAULT_SETTINGS: Settings = {
     anthropic: '',
     google: '',
   },
-  theme: 'dark',
   lastUsedModel: null,
 };
 

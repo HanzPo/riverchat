@@ -1,57 +1,60 @@
 <template>
-  <div class="chat-history">
+  <div class="flex flex-col h-full bg-background-paper">
     <!-- Header -->
-    <div class="chat-header glass">
-      <h2 style="font-size: 18px; font-weight: 700; color: var(--text-primary);">
+    <div class="p-5 border-b border-white/15 card-material">
+      <h2 class="text-lg font-bold text-white/95">
         Chat History
       </h2>
-      <p style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">
+      <p class="text-xs text-white/70 mt-1.5 font-medium">
         {{ path.length }} message{{ path.length !== 1 ? 's' : '' }} in this branch
       </p>
     </div>
 
     <!-- Messages -->
-    <div class="messages-container">
-      <div v-if="path.length === 0" class="empty-state">
-        <p style="color: var(--text-secondary); font-size: 14px; text-align: center;">
+    <div class="flex-1 overflow-y-auto p-4">
+      <div v-if="path.length === 0" class="flex items-center justify-center h-full px-5 py-10">
+        <p class="text-white/70 text-sm text-center font-medium">
           Select a node to view its conversation path
         </p>
       </div>
 
-      <div v-else class="messages-list">
+      <div v-else class="flex flex-col gap-3">
         <div
           v-for="message in path"
           :key="message.id"
-          class="message-item glass"
+          class="p-3.5 cursor-pointer transition-all duration-200 ease-material rounded-lg card-material hover:-translate-x-1"
           :class="{
-            'message-user': message.type === 'user',
-            'message-ai': message.type === 'ai',
-            'message-selected': message.id === selectedNodeId,
+            'bg-primary/20 border-primary/40': message.type === 'user',
+            'bg-secondary/20 border-secondary/40': message.type === 'ai',
+            'border-2 border-primary shadow-[0_0_0_3px] shadow-primary/30': message.id === selectedNodeId,
           }"
           @click="$emit('node-select', message.id)"
         >
           <!-- Header -->
-          <div class="message-header">
-            <span class="message-badge" :class="`badge-${message.type}`">
-              {{ message.type === 'user' ? '👤 You' : '🤖 AI' }}
+          <div class="flex justify-between items-center mb-2.5 gap-2">
+            <span 
+              class="text-[10.5px] font-bold px-2.5 py-1 rounded-md uppercase tracking-wider border"
+              :class="message.type === 'user' ? 'bg-primary/30 border-primary/50 text-primary' : 'bg-secondary/30 border-secondary/50 text-secondary'"
+            >
+              {{ message.type === 'user' ? '👤 YOU' : '🤖 AI' }}
             </span>
-            <span v-if="message.model" class="message-model">
+            <span v-if="message.model" class="text-[11px] font-medium text-white/75 overflow-hidden text-ellipsis whitespace-nowrap">
               {{ message.model.displayName }}
             </span>
           </div>
 
           <!-- Content -->
-          <div class="message-content">
+          <div class="text-white/95 text-[13.5px] leading-relaxed mb-2.5 break-words whitespace-pre-wrap">
             {{ message.content || '...' }}
-            <span v-if="message.state === 'generating'" class="generating-cursor">▊</span>
+            <span v-if="message.state === 'generating'" class="inline-block animate-blink text-info font-bold">▊</span>
           </div>
 
           <!-- Footer -->
-          <div class="message-footer">
-            <span class="message-time">
+          <div class="flex justify-between items-center text-[11px] text-white/70">
+            <span class="font-medium">
               {{ formatTime(message.timestamp) }}
             </span>
-            <span v-if="message.state === 'error'" class="message-error">
+            <span v-if="message.state === 'error'" class="text-error font-bold">
               ⚠️ Error
             </span>
           </div>
@@ -60,9 +63,9 @@
     </div>
 
     <!-- Input Area -->
-    <div class="input-area glass">
-      <div style="display: flex; gap: 8px; margin-bottom: 8px; align-items: center;">
-        <select v-model="selectedModel" class="glass-select" style="flex: 1; padding: 8px;">
+    <div class="p-4 border-t border-white/15 card-material">
+      <div class="flex gap-2 mb-3 items-center">
+        <select v-model="selectedModel" class="select-material flex-1 py-2.5">
           <optgroup
             v-for="provider in modelsByProvider"
             :key="provider.name"
@@ -81,19 +84,18 @@
 
       <textarea
         v-model="inputText"
-        class="glass-textarea"
+        class="textarea-material text-[13.5px]"
         placeholder="Type your message... (Ctrl+Enter to send)"
         rows="3"
         @keydown.ctrl.enter="handleSend"
         @keydown.meta.enter="handleSend"
       ></textarea>
 
-      <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px;">
+      <div class="flex justify-end gap-2 mt-3">
         <button
           @click="handleSend"
           :disabled="!inputText.trim() || !canSend"
-          class="glass-button"
-          style="padding: 8px 16px; font-weight: 600;"
+          class="btn-material px-5 py-2.5 font-bold"
         >
           Send
         </button>
@@ -177,102 +179,6 @@ function formatTime(timestamp: number): string {
 </script>
 
 <style scoped>
-.chat-history {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  background: var(--bg-secondary);
-}
-
-.chat-header {
-  padding: 20px;
-  border-bottom: 1px solid var(--glass-border);
-}
-
-.messages-container {
-  flex: 1;
-  overflow-y: auto;
-  padding: 16px;
-}
-
-.empty-state {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  padding: 40px 20px;
-}
-
-.messages-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.message-item {
-  padding: 12px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.message-item:hover {
-  transform: translateX(-4px);
-}
-
-.message-user {
-  background: var(--user-node-bg);
-}
-
-.message-ai {
-  background: var(--ai-node-bg);
-}
-
-.message-selected {
-  border: 2px solid rgba(102, 126, 234, 0.6);
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
-}
-
-.message-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-  gap: 8px;
-}
-
-.message-badge {
-  font-size: 11px;
-  font-weight: 700;
-  padding: 3px 8px;
-  border-radius: 4px;
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-}
-
-.message-model {
-  font-size: 11px;
-  color: var(--text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.message-content {
-  color: var(--text-primary);
-  font-size: 14px;
-  line-height: 1.6;
-  margin-bottom: 8px;
-  word-wrap: break-word;
-  white-space: pre-wrap;
-}
-
-.generating-cursor {
-  display: inline-block;
-  animation: blink 1s step-start infinite;
-  color: var(--info-color);
-  font-weight: bold;
-}
-
 @keyframes blink {
   0%, 50% {
     opacity: 1;
@@ -282,36 +188,7 @@ function formatTime(timestamp: number): string {
   }
 }
 
-.message-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 11px;
-  color: var(--text-secondary);
-}
-
-.message-error {
-  color: var(--error-color);
-  font-weight: 600;
-}
-
-.input-area {
-  padding: 16px;
-  border-top: 1px solid var(--glass-border);
-}
-
-/* Scrollbar styling for messages */
-.messages-container::-webkit-scrollbar {
-  width: 6px;
-}
-
-.messages-container::-webkit-scrollbar-thumb {
-  background: var(--glass-bg);
-  border-radius: 3px;
-}
-
-.messages-container::-webkit-scrollbar-thumb:hover {
-  background: var(--glass-bg-hover);
+.animate-blink {
+  animation: blink 1s step-start infinite;
 }
 </style>
-

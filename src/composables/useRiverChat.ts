@@ -78,6 +78,65 @@ export function useRiverChat() {
     }
   }
 
+  // Helper function to calculate smart position for new nodes
+  function calculateSmartPosition(parentId: string | null): { x: number; y: number } | undefined {
+    if (!currentRiver.value) return undefined;
+
+    const HORIZONTAL_SPACING = 350;
+    const VERTICAL_SPACING = 200;
+
+    if (!parentId) {
+      // This is a new root node - find all existing root nodes
+      const rootNodes = Object.values(currentRiver.value.nodes).filter(n => !n.parentId);
+      
+      if (rootNodes.length === 0) {
+        // First node ever
+        return { x: 0, y: 0 };
+      }
+
+      // Find the rightmost position among all nodes
+      const allPositions = Object.values(currentRiver.value.nodes)
+        .map(n => n.position)
+        .filter(p => p !== undefined) as { x: number; y: number }[];
+      
+      if (allPositions.length === 0) {
+        // No positions stored yet, use default spacing
+        return { x: rootNodes.length * 500, y: 0 };
+      }
+
+      const maxX = Math.max(...allPositions.map(p => p.x));
+      return { x: maxX + 500, y: 0 };
+    }
+
+    // Node with a parent - position it below the parent
+    const parent = currentRiver.value.nodes[parentId];
+    if (!parent) return undefined;
+
+    const parentPos = parent.position;
+    if (!parentPos) {
+      // Parent has no stored position, will be calculated by layout algorithm
+      return undefined;
+    }
+
+    // Find siblings (other children of the same parent)
+    const siblings = Object.values(currentRiver.value.nodes)
+      .filter(n => n.parentId === parentId && n.position);
+
+    if (siblings.length === 0) {
+      // First child - position directly below parent
+      return { x: parentPos.x, y: parentPos.y + VERTICAL_SPACING };
+    }
+
+    // Position to the right of existing siblings
+    const siblingPositions = siblings.map(s => s.position!);
+    const maxSiblingX = Math.max(...siblingPositions.map(p => p.x));
+    
+    return {
+      x: maxSiblingX + HORIZONTAL_SPACING,
+      y: parentPos.y + VERTICAL_SPACING
+    };
+  }
+
   // Node Management
   function createUserNode(content: string, parentId: string | null = null): MessageNode {
     if (!currentRiver.value) {
@@ -91,6 +150,7 @@ export function useRiverChat() {
       timestamp: Date.now(),
       parentId,
       state: 'complete',
+      position: calculateSmartPosition(parentId),
     };
 
     currentRiver.value.nodes[node.id] = node;
@@ -115,6 +175,7 @@ export function useRiverChat() {
       parentId,
       state: 'generating',
       model,
+      position: calculateSmartPosition(parentId),
     };
 
     currentRiver.value.nodes[node.id] = node;
@@ -216,6 +277,14 @@ export function useRiverChat() {
     }
   }
 
+  function updateNodePosition(nodeId: string, position: { x: number; y: number }): void {
+    if (!currentRiver.value) return;
+    const node = currentRiver.value.nodes[nodeId];
+    if (node) {
+      node.position = position;
+    }
+  }
+
   function getPathToNode(nodeId: string): MessageNode[] {
     if (!currentRiver.value) return [];
 
@@ -284,6 +353,7 @@ export function useRiverChat() {
     generateAIResponse,
     deleteNode,
     updateNodeContent,
+    updateNodePosition,
     getPathToNode,
     getChildren,
 

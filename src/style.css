@@ -1,23 +1,179 @@
-/* Import Glassmorphism theme */
-@import './assets/glassmorphism.css';
-
-/* Reset and Global Styles */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-html, body {
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-}
-
-#app {
-  width: 100%;
-  height: 100%;
-}
-
 /* Google Fonts - Inter */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@import "tailwindcss";
+
+/* Tailwind v4 Theme Configuration */
+@theme {
+  --color-primary: #4a9eff;
+  --color-primary-variant: #1565c0;
+  --color-secondary: #03dac6;
+  --color-secondary-variant: #018786;
+  --color-background: #000000;
+  --color-background-paper: #0a0a0a;
+  --color-background-elevated: #1a1a1a;
+  --color-error: #cf6679;
+  --color-success: #4caf50;
+  --color-warning: #ff9800;
+  --color-info: #2196f3;
+  
+  /* Text opacity levels for dark theme */
+  --text-high-emphasis: rgba(255, 255, 255, 0.95);
+  --text-medium-emphasis: rgba(255, 255, 255, 0.75);
+  --text-disabled: rgba(255, 255, 255, 0.38);
+  
+  --shadow-elevation-1: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
+  --shadow-elevation-2: 0 3px 6px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.12);
+  --shadow-elevation-3: 0 10px 20px rgba(0, 0, 0, 0.19), 0 6px 6px rgba(0, 0, 0, 0.23);
+  --shadow-elevation-4: 0 14px 28px rgba(0, 0, 0, 0.25), 0 10px 10px rgba(0, 0, 0, 0.22);
+  --shadow-elevation-5: 0 19px 38px rgba(0, 0, 0, 0.30), 0 15px 12px rgba(0, 0, 0, 0.22);
+  
+  --ease-material: cubic-bezier(0.4, 0, 0.2, 1);
+  
+  --animate-fadeIn: fadeIn 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --animate-slideUp: slideUp 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Keyframe Animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Custom Material Design Component Classes */
+
+/* Material Button */
+.btn-material {
+  @apply bg-background-elevated border border-white/20 
+         px-4 py-2 rounded uppercase text-sm font-semibold tracking-wide
+         transition-all duration-200 cursor-pointer
+         hover:shadow-elevation-2 hover:border-primary hover:bg-primary/10 active:scale-[0.98]
+         disabled:opacity-38 disabled:cursor-not-allowed;
+  color: var(--text-high-emphasis);
+  transition-timing-function: var(--ease-material);
+}
+
+/* Material Card */
+.card-material {
+  @apply bg-background-paper/90 backdrop-blur-lg border border-white/15 
+         rounded-lg shadow-elevation-2 transition-all duration-200;
+  transition-timing-function: var(--ease-material);
+}
+
+.card-material-hover {
+  @apply hover:bg-background-elevated/95 hover:-translate-y-0.5 hover:shadow-elevation-3;
+}
+
+/* Material Input */
+.input-material {
+  @apply bg-background-paper border border-white/20 border-b-2 
+         px-4 py-3 rounded-t text-sm w-full transition-all duration-200
+         outline-none focus:border-b-primary focus:bg-background-elevated
+         placeholder:text-white/38;
+  color: var(--text-high-emphasis);
+  transition-timing-function: var(--ease-material);
+}
+
+/* Material Textarea */
+.textarea-material {
+  @apply bg-background-paper border border-white/20  
+         px-4 py-3 rounded text-sm w-full min-h-[100px] resize-y
+         transition-all duration-200 outline-none
+         focus:border-primary focus:bg-background-elevated focus:shadow-[0_0_0_1px] focus:shadow-primary
+         placeholder:text-white/38;
+  color: var(--text-high-emphasis);
+  transition-timing-function: var(--ease-material);
+}
+
+/* Material Select */
+.select-material {
+  @apply bg-background-paper border border-white/20 
+         px-3.5 py-2.5 rounded text-sm cursor-pointer font-medium
+         transition-all duration-200 outline-none
+         focus:border-primary focus:shadow-[0_0_0_1px] focus:shadow-primary;
+  color: var(--text-high-emphasis);
+  transition-timing-function: var(--ease-material);
+}
+
+/* Modal */
+.modal-backdrop {
+  @apply fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[1000];
+  animation: var(--animate-fadeIn);
+}
+
+.modal-content {
+  @apply bg-background-elevated border border-white/20 shadow-elevation-5 
+         rounded-lg max-w-[90vw] max-h-[90vh] overflow-auto;
+  animation: var(--animate-slideUp);
+}
+
+/* Context Menu */
+.context-menu {
+  @apply fixed bg-background-elevated border border-white/20 shadow-elevation-4 
+         rounded-lg p-1.5 z-[2000] min-w-[220px];
+  animation: var(--animate-fadeIn);
+}
+
+.context-menu-item {
+  @apply px-4 py-2.5 cursor-pointer rounded transition-all duration-150
+         text-sm font-medium flex items-center gap-3
+         hover:bg-white/8;
+  color: var(--text-high-emphasis);
+  transition-timing-function: var(--ease-material);
+}
+
+.context-menu-item-danger {
+  @apply hover:bg-error/20 hover:text-error;
+}
+
+/* Toast */
+.toast {
+  @apply fixed bottom-6 right-6 px-5 py-3.5 rounded-lg z-[9999] shadow-elevation-4 font-medium text-sm;
+  animation: var(--animate-slideUp);
+}
+
+.toast-info {
+  @apply bg-info/25 border-2 border-info/50 text-info;
+}
+
+.toast-success {
+  @apply bg-success/25 border-2 border-success/50 text-success;
+}
+
+.toast-error {
+  @apply bg-error/25 border-2 border-error/50 text-error;
+}
+
+/* Loading */
+.loading {
+  @apply animate-pulse;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  @apply w-2.5 h-2.5;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-background;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-white/15 rounded;
+  transition: background-color 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-white/25;
+}
