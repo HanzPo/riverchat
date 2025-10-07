@@ -33,6 +33,13 @@ export interface MessageNode {
   model?: LLMModel; // Only for AI nodes
   error?: string; // Only for error state
   position?: { x: number; y: number }; // Node position in the canvas
+  branchMetadata?: BranchMetadata; // Metadata for branches created from text selection
+}
+
+export interface BranchMetadata {
+  sourceNodeId: string; // The node this was branched from
+  highlightedText: string; // The text that was highlighted
+  elaborationPrompt?: string; // The prompt used for elaboration
 }
 
 export interface River {

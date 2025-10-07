@@ -22,9 +22,16 @@ export class LLMAPIService {
 
     // Convert to ChatMessage format
     for (const node of path) {
+      let content = node.content;
+      
+      // If this node has branch metadata, add the highlighted text as context
+      if (node.branchMetadata) {
+        content = `[Selected text from previous message]\n"${node.branchMetadata.highlightedText}"\n\n${node.content}`;
+      }
+      
       messages.push({
         role: node.type === 'user' ? 'user' : 'assistant',
-        content: node.content,
+        content: content,
       });
     }
 

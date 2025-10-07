@@ -86,12 +86,36 @@ export function useRiverChat() {
     }
   }
 
+  // Helper function to estimate node dimensions based on content
+  function estimateNodeDimensions(node: MessageNode): { width: number; height: number } {
+    const BASE_WIDTH = 300; // Average node width (min 280, max 320)
+    const BASE_HEIGHT = 120; // Base height for header, timestamp, etc.
+    const BRANCH_METADATA_HEIGHT = 80; // Extra height for branch metadata
+    
+    let estimatedHeight = BASE_HEIGHT;
+    
+    // Add height based on content length (accounting for word wrap at ~300px width)
+    const contentLength = node.content.length;
+    const estimatedLines = Math.ceil(contentLength / 40); // ~40 chars per line at 300px
+    estimatedHeight += estimatedLines * 20; // ~20px per line
+    
+    // Add extra height for branch metadata
+    if (node.branchMetadata) {
+      estimatedHeight += BRANCH_METADATA_HEIGHT;
+    }
+    
+    // Cap at reasonable max
+    estimatedHeight = Math.min(estimatedHeight, 400);
+    
+    return { width: BASE_WIDTH, height: estimatedHeight };
+  }
+
   // Helper function to calculate smart position for new nodes
   function calculateSmartPosition(parentId: string | null): { x: number; y: number } | undefined {
     if (!currentRiver.value) return undefined;
 
-    const HORIZONTAL_SPACING = 350;
-    const VERTICAL_SPACING = 200;
+    const BASE_HORIZONTAL_SPACING = 80; // Minimum gap between nodes
+    const BASE_VERTICAL_SPACING = 50; // Minimum gap between levels
 
     if (!parentId) {
       // This is a new root node - find all existing root nodes
@@ -102,7 +126,7 @@ export function useRiverChat() {
         return { x: 0, y: 0 };
       }
 
-      // Find the rightmost position among all nodes
+      // Find the rightmost position among all nodes and calculate spacing
       const allPositions = Object.values(currentRiver.value.nodes)
         .map(n => n.position)
         .filter(p => p !== undefined) as { x: number; y: number }[];
@@ -112,8 +136,18 @@ export function useRiverChat() {
         return { x: rootNodes.length * 500, y: 0 };
       }
 
+      // Find the rightmost node and its dimensions
       const maxX = Math.max(...allPositions.map(p => p.x));
-      return { x: maxX + 500, y: 0 };
+      const rightmostNode = Object.values(currentRiver.value.nodes).find(
+        n => n.position?.x === maxX
+      );
+      
+      if (rightmostNode) {
+        const nodeDims = estimateNodeDimensions(rightmostNode);
+        return { x: maxX + nodeDims.width + BASE_HORIZONTAL_SPACING, y: 0 };
+      }
+      
+      return { x: maxX + 380, y: 0 };
     }
 
     // Node with a parent - position it below the parent
@@ -126,22 +160,37 @@ export function useRiverChat() {
       return undefined;
     }
 
+    // Get parent dimensions
+    const parentDims = estimateNodeDimensions(parent);
+
     // Find siblings (other children of the same parent)
     const siblings = Object.values(currentRiver.value.nodes)
       .filter(n => n.parentId === parentId && n.position);
 
     if (siblings.length === 0) {
       // First child - position directly below parent
-      return { x: parentPos.x, y: parentPos.y + VERTICAL_SPACING };
+      return { 
+        x: parentPos.x, 
+        y: parentPos.y + parentDims.height + BASE_VERTICAL_SPACING 
+      };
     }
 
     // Position to the right of existing siblings
     const siblingPositions = siblings.map(s => s.position!);
     const maxSiblingX = Math.max(...siblingPositions.map(p => p.x));
     
+    // Find the rightmost sibling to calculate proper spacing
+    const rightmostSibling = siblings.find(s => s.position?.x === maxSiblingX);
+    let horizontalSpacing = 380; // Default
+    
+    if (rightmostSibling) {
+      const siblingDims = estimateNodeDimensions(rightmostSibling);
+      horizontalSpacing = siblingDims.width + BASE_HORIZONTAL_SPACING;
+    }
+    
     return {
-      x: maxSiblingX + HORIZONTAL_SPACING,
-      y: parentPos.y + VERTICAL_SPACING
+      x: maxSiblingX + horizontalSpacing,
+      y: parentPos.y + parentDims.height + BASE_VERTICAL_SPACING
     };
   }
 
@@ -240,6 +289,45 @@ export function useRiverChat() {
         }
       }
     );
+  }
+
+  async function branchFromText(
+    sourceNodeId: string,
+    highlightedText: string,
+    userPrompt: string,
+    model: LLMModel
+  ): Promise<void> {
+    if (!currentRiver.value) {
+      throw new Error('No active river');
+    }
+
+    const sourceNode = currentRiver.value.nodes[sourceNodeId];
+    if (!sourceNode) {
+      throw new Error('Source node not found');
+    }
+
+    // Store only the user's prompt as the content
+    // The highlighted text is stored in branchMetadata
+    const userNode: MessageNode = {
+      id: uuidv4(),
+      type: 'user',
+      content: userPrompt,
+      timestamp: Date.now(),
+      parentId: sourceNodeId,
+      state: 'complete',
+      position: calculateSmartPosition(sourceNodeId),
+      branchMetadata: {
+        sourceNodeId,
+        highlightedText,
+        elaborationPrompt: userPrompt,
+      },
+    };
+
+    currentRiver.value.nodes[userNode.id] = userNode;
+    selectedNodeId.value = userNode.id;
+
+    // Generate AI response for this branch
+    await generateAIResponse(userNode.id, model);
   }
 
   function deleteNode(nodeId: string): void {
@@ -359,6 +447,7 @@ export function useRiverChat() {
     // Node methods
     createUserNode,
     generateAIResponse,
+    branchFromText,
     deleteNode,
     updateNodeContent,
     updateNodePosition,

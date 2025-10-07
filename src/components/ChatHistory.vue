@@ -1,5 +1,14 @@
 <template>
-  <div class="flex flex-col h-full bg-background-paper">
+  <div class="flex flex-col h-full bg-background-paper relative">
+    <!-- Text Highlight Popover (render at top level for proper positioning) -->
+    <Teleport to="body">
+      <TextHighlightPopover
+        :visible="highlightPopover.visible"
+        :position="highlightPopover.position"
+        @branch="handleSetBranchContext"
+      />
+    </Teleport>
+
     <!-- Header -->
     <div class="p-5 border-b border-white/15 card-material">
       <h2 class="text-lg font-bold text-white/95">
@@ -40,23 +49,44 @@
             'bg-secondary/20 border-secondary/40': message.type === 'ai',
             'border-2 border-primary shadow-[0_0_0_3px] shadow-primary/30': message.id === selectedNodeId,
           }"
-          @click="$emit('node-select', message.id)"
+          @click.stop="$emit('node-select', message.id)"
         >
           <!-- Header -->
           <div class="flex justify-between items-center mb-2.5 gap-2">
-            <span 
-              class="text-[10.5px] font-bold px-2.5 py-1 rounded-md uppercase tracking-wider border"
-              :class="message.type === 'user' ? 'bg-primary/30 border-primary/50 text-primary' : 'bg-secondary/30 border-secondary/50 text-secondary'"
-            >
-              {{ message.type === 'user' ? '👤 YOU' : '🤖 AI' }}
-            </span>
+            <div class="flex items-center gap-2">
+              <span 
+                class="text-[10.5px] font-bold px-2.5 py-1 rounded-md uppercase tracking-wider border"
+                :class="message.type === 'user' ? 'bg-primary/30 border-primary/50 text-primary' : 'bg-secondary/30 border-secondary/50 text-secondary'"
+              >
+                {{ message.type === 'user' ? '👤 YOU' : '🤖 AI' }}
+              </span>
+              <span
+                v-if="getBranchCount(message.id) > 0"
+                class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-accent/30 border border-accent/50 text-accent flex items-center gap-1"
+                :title="`${getBranchCount(message.id)} branch${getBranchCount(message.id) > 1 ? 'es' : ''} from highlighted text`"
+              >
+                <span>🌿</span>
+                <span>{{ getBranchCount(message.id) }}</span>
+              </span>
+            </div>
             <span v-if="message.model" class="text-[11px] font-medium text-white/75 overflow-hidden text-ellipsis whitespace-nowrap">
               {{ message.model.displayName }}
             </span>
           </div>
 
+          <!-- Branch Metadata (if this message is a branch) -->
+          <div v-if="message.branchMetadata" class="mb-2.5 p-2.5 bg-accent/10 border border-accent/30 rounded-md">
+            <div class="text-[10px] font-bold text-white/60 uppercase tracking-wider mb-1.5">Selected Text</div>
+            <div class="text-[12px] text-white/75 italic font-medium pl-2 border-l-2 border-accent/50">
+              "{{ message.branchMetadata.highlightedText }}"
+            </div>
+          </div>
+
           <!-- Content -->
-          <div class="text-white/95 text-[13.5px] leading-relaxed mb-2.5 break-words markdown-content">
+          <div 
+            class="text-white/95 text-[13.5px] leading-relaxed mb-2.5 break-words markdown-content"
+            @mouseup.stop="handleTextSelection($event, message.id)"
+          >
             <div v-html="renderMarkdown(message.content || '...')"></div>
             <span v-if="message.state === 'generating'" class="inline-block animate-blink text-info font-bold">▊</span>
           </div>
@@ -76,6 +106,26 @@
 
     <!-- Input Area -->
     <div class="p-4 border-t border-white/15 card-material">
+      <!-- Branch Context Display (like Cursor) -->
+      <div v-if="branchContext.text" class="mb-3 p-3 bg-accent/10 border border-accent/30 rounded-lg animate-slide-in">
+        <div class="flex items-start justify-between gap-2 mb-2">
+          <div class="flex items-center gap-2">
+            <span class="text-accent text-sm">🌿</span>
+            <span class="text-[11px] font-bold text-accent uppercase tracking-wider">Selected Context</span>
+          </div>
+          <button
+            @click="clearBranchContext"
+            class="text-white/50 hover:text-white/90 transition-colors text-xs font-bold px-2 py-0.5 hover:bg-white/10 rounded"
+            title="Clear context"
+          >
+            ✕
+          </button>
+        </div>
+        <div class="text-[12px] text-white/75 italic pl-3 border-l-2 border-accent/50 max-h-24 overflow-y-auto">
+          "{{ branchContext.text }}"
+        </div>
+      </div>
+
       <div class="flex gap-2 mb-3 items-center">
         <select v-model="selectedModel" class="select-material flex-1 py-2.5">
           <optgroup
@@ -98,7 +148,7 @@
         ref="textareaRef"
         v-model="inputText"
         class="textarea-material text-[13.5px]"
-        placeholder="Type your message... (Ctrl+Enter to send)"
+        :placeholder="branchContext.text ? 'Ask about the selected text...' : 'Type your message... (Ctrl+Enter to send)'"
         rows="3"
         @keydown.ctrl.enter="handleSend"
         @keydown.meta.enter="handleSend"
@@ -110,7 +160,7 @@
           :disabled="!inputText.trim() || !canSend"
           class="btn-material px-5 py-2.5 font-bold"
         >
-          Send
+          {{ branchContext.text ? 'Send Branch' : 'Send' }}
         </button>
       </div>
     </div>
@@ -123,17 +173,21 @@ import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import type { MessageNode, LLMModel } from '../types';
 import { AVAILABLE_MODELS } from '../types';
+import TextHighlightPopover from './TextHighlightPopover.vue';
 
 interface Props {
   path: MessageNode[];
   selectedNodeId: string | null;
   lastUsedModel: LLMModel | null;
   isNewRootMode?: boolean;
+  allNodes?: Record<string, MessageNode>;
 }
 
 interface Emits {
   (e: 'send', content: string, model: LLMModel): void;
   (e: 'node-select', nodeId: string): void;
+  (e: 'branch-from-text', nodeId: string, highlightedText: string, elaborationPrompt: string, model: LLMModel): void;
+  (e: 'model-changed', model: LLMModel): void;
 }
 
 const props = defineProps<Props>();
@@ -144,11 +198,35 @@ const selectedModel = ref('');
 const messagesContainer = ref<HTMLElement | null>(null);
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
 
+// Text selection and highlight popover state
+const highlightPopover = ref({
+  visible: false,
+  position: { x: 0, y: 0 },
+  selectedText: '',
+  sourceNodeId: '',
+});
+
+// Branch context state (shows above input like Cursor)
+const branchContext = ref({
+  text: '',
+  sourceNodeId: '',
+});
+
+let isSelecting = false;
+
 // Configure marked for better rendering
 marked.setOptions({
   breaks: true, // Convert \n to <br>
   gfm: true, // GitHub Flavored Markdown
 });
+
+// Helper to get branch count for a message
+function getBranchCount(nodeId: string): number {
+  if (!props.allNodes) return 0;
+  return Object.values(props.allNodes).filter(
+    node => node.branchMetadata?.sourceNodeId === nodeId
+  ).length;
+}
 
 // Render markdown content safely
 function renderMarkdown(content: string): string {
@@ -174,7 +252,7 @@ const modelsByProvider = computed(() => {
   return Object.values(providers);
 });
 
-// Initialize with last used model
+// Initialize with last used model or default to GPT-4o
 watch(
   () => props.lastUsedModel,
   (model) => {
@@ -185,10 +263,25 @@ watch(
   { immediate: true }
 );
 
-// Set default model if none selected
-if (!selectedModel.value && AVAILABLE_MODELS.length > 0) {
-  selectedModel.value = JSON.stringify(AVAILABLE_MODELS[0]);
+// Set default model to GPT-4o if none selected
+if (!selectedModel.value) {
+  const gpt4o = AVAILABLE_MODELS.find(m => m.name === 'gpt-4o');
+  if (gpt4o) {
+    selectedModel.value = JSON.stringify(gpt4o);
+  } else if (AVAILABLE_MODELS.length > 0) {
+    // Fallback to first available model if GPT-4o not found
+    selectedModel.value = JSON.stringify(AVAILABLE_MODELS[0]);
+  }
 }
+
+// Watch for model changes and persist to settings
+watch(selectedModel, (newModel) => {
+  if (newModel) {
+    const model = JSON.parse(newModel) as LLMModel;
+    // Emit model change so parent can save it
+    emit('model-changed', model);
+  }
+});
 
 const canSend = computed(() => {
   return props.isNewRootMode || props.path.length === 0 || props.path[props.path.length - 1]?.type === 'ai';
@@ -221,7 +314,17 @@ watch(
 function handleSend() {
   if (inputText.value.trim() && selectedModel.value && canSend.value) {
     const model = JSON.parse(selectedModel.value) as LLMModel;
-    emit('send', inputText.value.trim(), model);
+    
+    // Check if we have branch context
+    if (branchContext.value.text && branchContext.value.sourceNodeId) {
+      // Send as a branch with context
+      emit('branch-from-text', branchContext.value.sourceNodeId, branchContext.value.text, inputText.value.trim(), model);
+      clearBranchContext();
+    } else {
+      // Regular message
+      emit('send', inputText.value.trim(), model);
+    }
+    
     inputText.value = '';
   }
 }
@@ -229,6 +332,106 @@ function handleSend() {
 function formatTime(timestamp: number): string {
   const date = new Date(timestamp);
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function handleTextSelection(event: MouseEvent, nodeId: string) {
+  // Prevent triggering node selection when selecting text
+  event.stopPropagation();
+  
+  // Small delay to allow selection to complete
+  setTimeout(() => {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) {
+      if (!isSelecting) {
+        highlightPopover.value.visible = false;
+      }
+      return;
+    }
+    
+    const selectedText = selection.toString().trim();
+
+    if (selectedText && selectedText.length > 0) {
+      const range = selection.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+
+      if (rect && rect.width > 0 && rect.height > 0) {
+        isSelecting = true;
+        
+        // Position popover to the left of the selection
+        // Use the left edge of the selection
+        const leftX = rect.left;
+        const topY = rect.top + window.scrollY;
+        
+        highlightPopover.value = {
+          visible: true,
+          position: {
+            x: leftX,
+            y: topY,
+          },
+          selectedText,
+          sourceNodeId: nodeId,
+        };
+        
+        // Reset the flag after a short delay
+        setTimeout(() => {
+          isSelecting = false;
+        }, 150);
+      }
+    } else {
+      // No text selected, hide popover
+      if (!isSelecting) {
+        highlightPopover.value.visible = false;
+      }
+    }
+  }, 50);
+}
+
+function handleSetBranchContext() {
+  if (highlightPopover.value.selectedText && highlightPopover.value.sourceNodeId) {
+    // Set the branch context to show above input
+    branchContext.value = {
+      text: highlightPopover.value.selectedText,
+      sourceNodeId: highlightPopover.value.sourceNodeId,
+    };
+    
+    // Hide popover
+    highlightPopover.value.visible = false;
+    
+    // Clear selection
+    window.getSelection()?.removeAllRanges();
+    
+    // Focus the textarea
+    nextTick(() => {
+      textareaRef.value?.focus();
+    });
+  }
+}
+
+function clearBranchContext() {
+  branchContext.value = {
+    text: '',
+    sourceNodeId: '',
+  };
+}
+
+// Close popover when clicking outside
+function handleDocumentClick(event: MouseEvent) {
+  // Don't close if we're in the middle of selecting
+  if (isSelecting) return;
+  
+  const target = event.target as HTMLElement;
+  // Don't close if clicking on the popover itself
+  if (!target.closest('.text-highlight-popover') && !target.closest('.popover-button')) {
+    highlightPopover.value.visible = false;
+  }
+}
+
+// Add document click listener
+if (typeof window !== 'undefined') {
+  // Use capture phase and a small delay to avoid interfering with selection
+  setTimeout(() => {
+    document.addEventListener('mousedown', handleDocumentClick);
+  }, 0);
 }
 </script>
 
@@ -354,5 +557,20 @@ function formatTime(timestamp: number): string {
 
 .markdown-content :deep(em) {
   font-style: italic;
+}
+
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-in {
+  animation: slide-in 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 </style>

@@ -87,8 +87,11 @@
           :selected-node-id="selectedNodeId"
           :last-used-model="settings.lastUsedModel"
           :is-new-root-mode="isNewRootMode"
+          :all-nodes="currentRiver?.nodes || {}"
           @send="handleSendMessage"
           @node-select="selectNode"
+          @branch-from-text="handleBranchFromText"
+          @model-changed="handleModelChanged"
         />
       </div>
     </div>
@@ -178,6 +181,7 @@ const {
   renameRiver,
   createUserNode,
   generateAIResponse,
+  branchFromText,
   deleteNode,
   updateNodeContent,
   updateNodePosition,
@@ -472,6 +476,22 @@ function handlePaneClick() {
 
 function handleSearch() {
   showToast('Search functionality coming soon!', 'info');
+}
+
+async function handleBranchFromText(nodeId: string, highlightedText: string, userPrompt: string, model: LLMModel) {
+  if (!currentRiver.value) return;
+
+  try {
+    await branchFromText(nodeId, highlightedText, userPrompt, model);
+    showToast('Creating branch with selected context...', 'info');
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : 'Failed to create branch', 'error');
+  }
+}
+
+function handleModelChanged(model: LLMModel) {
+  // Persist the selected model to settings
+  settings.value.lastUsedModel = model;
 }
 
 // Toast
