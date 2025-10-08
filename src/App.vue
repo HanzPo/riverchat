@@ -100,6 +100,8 @@
           @node-select="selectNode"
           @branch-from-text="handleBranchFromText"
           @model-changed="handleModelChanged"
+          @close="handleCloseChatPanel"
+          @pop-out="handlePopOutChat"
         />
       </div>
     </div>
@@ -173,6 +175,20 @@
       @close="showHelp = false"
     />
 
+    <ChatModal
+      :is-open="showChatModal"
+      :path="currentPath"
+      :selected-node-id="selectedNodeId"
+      :last-used-model="settings.lastUsedModel"
+      :is-new-root-mode="isNewRootMode"
+      :all-nodes="currentRiver?.nodes || {}"
+      @send="handleSendMessage"
+      @node-select="selectNode"
+      @branch-from-text="handleBranchFromText"
+      @model-changed="handleModelChanged"
+      @close="showChatModal = false"
+    />
+
     <!-- Toast Notification -->
     <div v-if="toast.visible" class="toast" :class="`toast-${toast.type}`">
       {{ toast.message }}
@@ -187,6 +203,7 @@ import type { MessageNode, LLMModel } from './types';
 
 import GraphCanvas from './components/GraphCanvas.vue';
 import ChatHistory from './components/ChatHistory.vue';
+import ChatModal from './components/ChatModal.vue';
 import WelcomeModal from './components/WelcomeModal.vue';
 import SettingsModal from './components/SettingsModal.vue';
 import RiverDashboard from './components/RiverDashboard.vue';
@@ -224,6 +241,7 @@ const showSettings = ref(false);
 const showRiverDashboard = ref(false);
 const showMessageViewer = ref(false);
 const showHelp = ref(false);
+const showChatModal = ref(false);
 const viewingMessage = ref<MessageNode | null>(null);
 const isNewRootMode = ref(false);
 const hasMultipleNodesSelected = ref(false);
@@ -585,6 +603,15 @@ function handleModelChanged(model: LLMModel) {
   settings.value.lastUsedModel = model;
 }
 
+function handleCloseChatPanel() {
+  selectNode(null);
+  isNewRootMode.value = false;
+}
+
+function handlePopOutChat() {
+  showChatModal.value = true;
+}
+
 // Toast
 function showToast(message: string, type: 'info' | 'success' | 'error' = 'info') {
   toast.value = { visible: true, message, type };
@@ -704,7 +731,9 @@ function setupKeyboardShortcuts() {
 
     // Escape: Close modals or deselect
     if (e.key === 'Escape') {
-      if (showHelp.value || showSettings.value || showRiverDashboard.value || showMessageViewer.value) {
+      if (showChatModal.value) {
+        showChatModal.value = false;
+      } else if (showHelp.value || showSettings.value || showRiverDashboard.value || showMessageViewer.value) {
         showHelp.value = false;
         showSettings.value = false;
         showRiverDashboard.value = false;

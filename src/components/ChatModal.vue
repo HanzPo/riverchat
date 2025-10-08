@@ -1,5 +1,189 @@
 <template>
-  <div class="flex flex-col h-full bg-background-paper relative">
+  <div v-if="isOpen" class="modal-backdrop" @click.self="emit('close')">
+    <div class="modal-content modal-chat-large flex flex-col">
+      <!-- Header -->
+      <div class="p-5 border-b border-white/15 card-material flex justify-between items-start gap-4">
+        <div class="flex-1">
+          <h2 class="text-xl font-bold text-white/95">
+            {{ isNewRootMode ? 'New Conversation Thread' : 'Chat History' }}
+          </h2>
+          <p class="text-sm text-white/70 mt-1.5 font-medium">
+            {{ isNewRootMode ? 'Start a new root conversation' : `${path.length} message${path.length !== 1 ? 's' : ''} in this branch` }}
+          </p>
+        </div>
+        <button
+          @click="emit('close')"
+          class="text-white/70 hover:text-white/95 hover:bg-white/10 transition-all p-2 rounded-md"
+          title="Close modal"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Messages -->
+      <div ref="messagesContainer" class="flex-1 overflow-y-auto p-6">
+        <div v-if="path.length === 0 && !isNewRootMode" class="flex items-center justify-center h-full px-5 py-10">
+          <p class="text-white/70 text-base text-center font-medium">
+            Type a message into the chat to create a new thread
+          </p>
+        </div>
+
+        <div v-if="isNewRootMode" class="flex items-center justify-center h-full px-5 py-10">
+          <div class="text-center">
+            <div class="text-5xl mb-5">🌊</div>
+            <p class="text-white/90 text-xl font-bold mb-3">
+              Start a New Thread
+            </p>
+            <p class="text-white/70 text-base font-medium">
+              This will create a new root conversation node. Type your message below to begin.
+            </p>
+          </div>
+        </div>
+
+        <div v-else class="flex flex-col gap-4 max-w-4xl mx-auto">
+          <div
+            v-for="message in path"
+            :key="message.id"
+            class="p-4 cursor-pointer transition-all duration-200 ease-material rounded-lg card-material hover:-translate-x-1"
+            :class="{
+              'bg-primary/20 border-primary/40': message.type === 'user',
+              'bg-secondary/20 border-secondary/40': message.type === 'ai',
+              'border-2 border-primary shadow-[0_0_0_3px] shadow-primary/30': message.id === selectedNodeId,
+            }"
+            @click.stop="$emit('node-select', message.id)"
+          >
+            <!-- Header -->
+            <div class="flex justify-between items-center mb-3 gap-2">
+              <div class="flex items-center gap-2">
+                <span 
+                  class="text-xs font-bold px-3 py-1.5 rounded-md uppercase tracking-wider border"
+                  :class="message.type === 'user' ? 'bg-primary/30 border-primary/50 text-primary' : 'bg-secondary/30 border-secondary/50 text-secondary'"
+                >
+                  {{ message.type === 'user' ? '👤 YOU' : '🤖 AI' }}
+                </span>
+                <span
+                  v-if="getBranchCount(message.id) > 0"
+                  class="text-xs font-bold px-2.5 py-1 rounded-md bg-accent/30 border border-accent/50 text-accent flex items-center gap-1"
+                  :title="`${getBranchCount(message.id)} branch${getBranchCount(message.id) > 1 ? 'es' : ''} from highlighted text`"
+                >
+                  <span>🌿</span>
+                  <span>{{ getBranchCount(message.id) }}</span>
+                </span>
+              </div>
+              <span v-if="message.model" class="text-xs font-medium text-white/75 overflow-hidden text-ellipsis whitespace-nowrap">
+                {{ message.model.displayName }}
+              </span>
+            </div>
+
+            <!-- Branch Metadata (if this message is a branch) -->
+            <div v-if="message.branchMetadata" class="mb-3 p-3 bg-accent/10 border border-accent/30 rounded-md">
+              <div class="text-xs font-bold text-white/60 uppercase tracking-wider mb-2">Selected Text</div>
+              <div class="text-sm text-white/75 italic font-medium pl-3 border-l-2 border-accent/50">
+                "{{ message.branchMetadata.highlightedText }}"
+              </div>
+            </div>
+
+            <!-- Content -->
+            <div 
+              class="text-white/95 text-sm leading-relaxed mb-3 break-words markdown-content"
+              @mouseup.stop="handleTextSelection($event, message.id)"
+            >
+              <div v-html="renderMarkdown(message.content || '...')"></div>
+              <span v-if="message.state === 'generating'" class="inline-block animate-blink text-info font-bold">▊</span>
+            </div>
+
+            <!-- Footer -->
+            <div class="flex justify-between items-center text-xs text-white/70">
+              <span class="font-medium">
+                {{ formatTime(message.timestamp) }}
+              </span>
+              <span v-if="message.state === 'error'" class="text-error font-bold">
+                ⚠️ Error
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Input Area -->
+      <div class="p-6 border-t border-white/15 card-material">
+        <!-- Hint when user node is selected -->
+        <div v-if="!canSend && !isNewRootMode && path.length > 0" class="flex items-center justify-center py-10 px-6">
+          <div class="text-center">
+            <div class="text-4xl mb-4">💬</div>
+            <p class="text-white/90 text-lg font-bold mb-3">
+              Select an AI response to reply
+            </p>
+            <p class="text-white/60 text-base font-medium">
+              You can only continue the conversation from an AI response
+            </p>
+          </div>
+        </div>
+
+        <!-- Normal input area when AI node is selected or in new root mode -->
+        <div v-else class="max-w-4xl mx-auto">
+          <!-- Branch Context Display (like Cursor) -->
+          <div v-if="branchContext.text" class="mb-4 p-3.5 bg-accent/10 border border-accent/30 rounded-lg animate-slide-in">
+            <div class="flex items-start justify-between gap-2 mb-2">
+              <div class="flex items-center gap-2">
+                <span class="text-accent text-base">🌿</span>
+                <span class="text-xs font-bold text-accent uppercase tracking-wider">Selected Context</span>
+              </div>
+              <button
+                @click="clearBranchContext"
+                class="text-white/50 hover:text-white/90 transition-colors text-sm font-bold px-2.5 py-1 hover:bg-white/10 rounded"
+                title="Clear context"
+              >
+                ✕
+              </button>
+            </div>
+            <div class="text-sm text-white/75 italic pl-3 border-l-2 border-accent/50 max-h-32 overflow-y-auto">
+              "{{ branchContext.text }}"
+            </div>
+          </div>
+
+          <div class="flex gap-3 mb-4 items-center">
+            <select v-model="selectedModel" class="select-material flex-1 py-3">
+              <optgroup
+                v-for="provider in modelsByProvider"
+                :key="provider.name"
+                :label="provider.name"
+              >
+                <option
+                  v-for="model in provider.models"
+                  :key="`${model.provider}-${model.name}`"
+                  :value="JSON.stringify(model)"
+                >
+                  {{ model.displayName }}
+                </option>
+              </optgroup>
+            </select>
+          </div>
+
+          <textarea
+            ref="textareaRef"
+            v-model="inputText"
+            class="textarea-material text-sm"
+            :placeholder="branchContext.text ? 'Ask about the selected text...' : 'Type your message... (Enter to send, Ctrl+Enter for newline)'"
+            rows="4"
+            @keydown="handleKeydown"
+          ></textarea>
+
+          <div class="flex justify-end gap-3 mt-4">
+            <button
+              @click="handleSend"
+              :disabled="!inputText.trim() || !canSend"
+              class="btn-material px-6 py-3 font-bold text-base"
+            >
+              Send
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Text Highlight Popover (render at top level for proper positioning) -->
     <Teleport to="body">
       <TextHighlightPopover
@@ -8,200 +192,6 @@
         @branch="handleSetBranchContext"
       />
     </Teleport>
-
-    <!-- Header -->
-    <div class="p-5 border-b border-white/15 card-material flex justify-between items-start gap-4">
-      <div class="flex-1">
-        <h2 class="text-lg font-bold text-white/95">
-          {{ isNewRootMode ? 'New Conversation Thread' : 'Chat History' }}
-        </h2>
-        <p class="text-xs text-white/70 mt-1.5 font-medium">
-          {{ isNewRootMode ? 'Start a new root conversation' : `${path.length} message${path.length !== 1 ? 's' : ''} in this branch` }}
-        </p>
-      </div>
-      <div class="flex gap-2 items-center">
-        <button
-          @click="$emit('pop-out')"
-          class="text-white/70 hover:text-white/95 hover:bg-white/10 transition-all p-2 rounded-md"
-          title="Pop out chat"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
-            <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" />
-          </svg>
-        </button>
-        <button
-          @click="$emit('close')"
-          class="text-white/70 hover:text-white/95 hover:bg-white/10 transition-all p-2 rounded-md"
-          title="Close chat"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
-          </svg>
-        </button>
-      </div>
-    </div>
-
-    <!-- Messages -->
-    <div ref="messagesContainer" class="flex-1 overflow-y-auto p-4">
-      <div v-if="path.length === 0 && !isNewRootMode" class="flex items-center justify-center h-full px-5 py-10">
-        <p class="text-white/70 text-sm text-center font-medium">
-          Type a message into the chat to create a new thread
-        </p>
-      </div>
-
-      <div v-if="isNewRootMode" class="flex items-center justify-center h-full px-5 py-10">
-        <div class="text-center">
-          <div class="text-4xl mb-4">🌊</div>
-          <p class="text-white/90 text-base font-bold mb-2">
-            Start a New Thread
-          </p>
-          <p class="text-white/70 text-sm font-medium">
-            This will create a new root conversation node. Type your message below to begin.
-          </p>
-        </div>
-      </div>
-
-      <div v-else class="flex flex-col gap-3">
-        <div
-          v-for="message in path"
-          :key="message.id"
-          class="p-3.5 cursor-pointer transition-all duration-200 ease-material rounded-lg card-material hover:-translate-x-1"
-          :class="{
-            'bg-primary/20 border-primary/40': message.type === 'user',
-            'bg-secondary/20 border-secondary/40': message.type === 'ai',
-            'border-2 border-primary shadow-[0_0_0_3px] shadow-primary/30': message.id === selectedNodeId,
-          }"
-          @click.stop="$emit('node-select', message.id)"
-        >
-          <!-- Header -->
-          <div class="flex justify-between items-center mb-2.5 gap-2">
-            <div class="flex items-center gap-2">
-              <span 
-                class="text-[10.5px] font-bold px-2.5 py-1 rounded-md uppercase tracking-wider border"
-                :class="message.type === 'user' ? 'bg-primary/30 border-primary/50 text-primary' : 'bg-secondary/30 border-secondary/50 text-secondary'"
-              >
-                {{ message.type === 'user' ? '👤 YOU' : '🤖 AI' }}
-              </span>
-              <span
-                v-if="getBranchCount(message.id) > 0"
-                class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-accent/30 border border-accent/50 text-accent flex items-center gap-1"
-                :title="`${getBranchCount(message.id)} branch${getBranchCount(message.id) > 1 ? 'es' : ''} from highlighted text`"
-              >
-                <span>🌿</span>
-                <span>{{ getBranchCount(message.id) }}</span>
-              </span>
-            </div>
-            <span v-if="message.model" class="text-[11px] font-medium text-white/75 overflow-hidden text-ellipsis whitespace-nowrap">
-              {{ message.model.displayName }}
-            </span>
-          </div>
-
-          <!-- Branch Metadata (if this message is a branch) -->
-          <div v-if="message.branchMetadata" class="mb-2.5 p-2.5 bg-accent/10 border border-accent/30 rounded-md">
-            <div class="text-[10px] font-bold text-white/60 uppercase tracking-wider mb-1.5">Selected Text</div>
-            <div class="text-[12px] text-white/75 italic font-medium pl-2 border-l-2 border-accent/50">
-              "{{ message.branchMetadata.highlightedText }}"
-            </div>
-          </div>
-
-          <!-- Content -->
-          <div 
-            class="text-white/95 text-[13.5px] leading-relaxed mb-2.5 break-words markdown-content"
-            @mouseup.stop="handleTextSelection($event, message.id)"
-          >
-            <div v-html="renderMarkdown(message.content || '...')"></div>
-            <span v-if="message.state === 'generating'" class="inline-block animate-blink text-info font-bold">▊</span>
-          </div>
-
-          <!-- Footer -->
-          <div class="flex justify-between items-center text-[11px] text-white/70">
-            <span class="font-medium">
-              {{ formatTime(message.timestamp) }}
-            </span>
-            <span v-if="message.state === 'error'" class="text-error font-bold">
-              ⚠️ Error
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Input Area -->
-    <div class="p-4 border-t border-white/15 card-material">
-      <!-- Hint when user node is selected -->
-      <div v-if="!canSend && !isNewRootMode && path.length > 0" class="flex items-center justify-center py-8 px-6">
-        <div class="text-center">
-          <div class="text-3xl mb-3">💬</div>
-          <p class="text-white/90 text-base font-bold mb-2">
-            Select an AI response to reply
-          </p>
-          <p class="text-white/60 text-sm font-medium">
-            You can only continue the conversation from an AI response
-          </p>
-        </div>
-      </div>
-
-      <!-- Normal input area when AI node is selected or in new root mode -->
-      <div v-else>
-        <!-- Branch Context Display (like Cursor) -->
-        <div v-if="branchContext.text" class="mb-3 p-3 bg-accent/10 border border-accent/30 rounded-lg animate-slide-in">
-          <div class="flex items-start justify-between gap-2 mb-2">
-            <div class="flex items-center gap-2">
-              <span class="text-accent text-sm">🌿</span>
-              <span class="text-[11px] font-bold text-accent uppercase tracking-wider">Selected Context</span>
-            </div>
-            <button
-              @click="clearBranchContext"
-              class="text-white/50 hover:text-white/90 transition-colors text-xs font-bold px-2 py-0.5 hover:bg-white/10 rounded"
-              title="Clear context"
-            >
-              ✕
-            </button>
-          </div>
-          <div class="text-[12px] text-white/75 italic pl-3 border-l-2 border-accent/50 max-h-24 overflow-y-auto">
-            "{{ branchContext.text }}"
-          </div>
-        </div>
-
-        <div class="flex gap-2 mb-3 items-center">
-          <select v-model="selectedModel" class="select-material flex-1 py-2.5">
-            <optgroup
-              v-for="provider in modelsByProvider"
-              :key="provider.name"
-              :label="provider.name"
-            >
-              <option
-                v-for="model in provider.models"
-                :key="`${model.provider}-${model.name}`"
-                :value="JSON.stringify(model)"
-              >
-                {{ model.displayName }}
-              </option>
-            </optgroup>
-          </select>
-        </div>
-
-        <textarea
-          ref="textareaRef"
-          v-model="inputText"
-          class="textarea-material text-[13.5px]"
-          :placeholder="branchContext.text ? 'Ask about the selected text...' : 'Type your message... (Enter to send, Ctrl+Enter for newline)'"
-          rows="3"
-          @keydown="handleKeydown"
-        ></textarea>
-
-        <div class="flex justify-end gap-2 mt-3">
-          <button
-            @click="handleSend"
-            :disabled="!inputText.trim() || !canSend"
-            class="btn-material px-5 py-2.5 font-bold"
-          >
-            Send
-          </button>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -214,6 +204,7 @@ import { AVAILABLE_MODELS } from '../types';
 import TextHighlightPopover from './TextHighlightPopover.vue';
 
 interface Props {
+  isOpen: boolean;
   path: MessageNode[];
   selectedNodeId: string | null;
   lastUsedModel: LLMModel | null;
@@ -222,12 +213,11 @@ interface Props {
 }
 
 interface Emits {
+  (e: 'close'): void;
   (e: 'send', content: string, model: LLMModel): void;
   (e: 'node-select', nodeId: string): void;
   (e: 'branch-from-text', nodeId: string, highlightedText: string, elaborationPrompt: string, model: LLMModel): void;
   (e: 'model-changed', model: LLMModel): void;
-  (e: 'close'): void;
-  (e: 'pop-out'): void;
 }
 
 const props = defineProps<Props>();
@@ -339,34 +329,19 @@ watch(
   { immediate: true, deep: true }
 );
 
-// Autofocus textarea when entering new root mode
+// Autofocus textarea when modal opens
 watch(
-  () => props.isNewRootMode,
-  async (isNewRootMode) => {
-    if (isNewRootMode) {
+  () => props.isOpen,
+  async (isOpen) => {
+    if (isOpen) {
       await nextTick();
-      textareaRef.value?.focus();
+      await nextTick();
+      setTimeout(() => {
+        textareaRef.value?.focus();
+      }, 100);
     }
   },
   { immediate: true }
-);
-
-// Autofocus textarea when an AI response is selected
-watch(
-  [() => props.selectedNodeId, () => props.path],
-  async () => {
-    // Only focus if we can send (i.e., an AI response is selected)
-    // and we're not in new root mode (already handled above)
-    if (canSend.value && !props.isNewRootMode && props.path.length > 0) {
-      // Wait for DOM to update (multiple ticks to ensure v-else renders)
-      await nextTick();
-      await nextTick();
-      // Add a small delay to ensure the textarea is fully rendered
-      setTimeout(() => {
-        textareaRef.value?.focus();
-      }, 50);
-    }
-  }
 );
 
 function handleKeydown(event: KeyboardEvent) {
@@ -509,6 +484,14 @@ if (typeof window !== 'undefined') {
 </script>
 
 <style scoped>
+.modal-chat-large {
+  width: 90vw;
+  max-width: 1400px;
+  height: 85vh;
+  max-height: 900px;
+  padding: 0;
+}
+
 @keyframes blink {
   0%, 50% {
     opacity: 1;

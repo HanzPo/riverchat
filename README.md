@@ -2,6 +2,24 @@
 
 A non-linear chat application that visualizes conversations as branching "Rivers." Explore different conversational paths simultaneously, manage multiple AI models, and interact with chat history in an intuitive, graph-based interface.
 
+roadmap 
+- fix model selection
+- add auth + storage
+- add a credits system for people who dont want to enter their own api keys
+  - they can just pay for credits
+  - stripe integration
+- resizeable nodes
+- fix keyboard shortcuts
+- clean up vibe coded code
+- add a way to export and import 
+- multiplayer??? (can firebase realtime db do this?)
+- summaries and other ai shit
+- fix design to look less ai sloppy
+  - chat history modal sucks
+  - font sucks
+  - too many emojis
+- new logo
+
 ![RiverChat - Non-linear AI Conversations](https://img.shields.io/badge/Vue-3.5-4FC08D?logo=vue.js&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white)
 ![Vite](https://img.shields.io/badge/Vite-7.1-646CFF?logo=vite&logoColor=white)
