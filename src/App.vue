@@ -32,6 +32,7 @@
       <!-- Left Panel: Graph Canvas -->
       <div class="flex-1 relative overflow-hidden">
         <GraphCanvas
+          ref="graphCanvas"
           v-if="currentRiver"
           :nodes="currentRiver.nodes"
           :root-node-id="currentRiver.rootNodeId"
@@ -48,11 +49,12 @@
           @copy-message="handleCopyMessage"
           @create-root-node="handleCreateRootNode"
           @pane-click="handlePaneClick"
+          @selection-change="handleSelectionChange"
         />
         
         <!-- New Root Node Button (Floating) -->
         <button 
-          v-if="currentRiver && !selectedNodeId && !isNewRootMode"
+          v-if="currentRiver && !selectedNodeId && !isNewRootMode && !hasMultipleNodesSelected"
           @click="handleCreateRootNode" 
           class="absolute top-4 right-4 btn-material px-6 py-3 text-sm font-bold flex items-center gap-2 z-10 shadow-elevation-3"
         >
@@ -78,7 +80,7 @@
       <!-- Right Panel: Chat History -->
       <div 
         ref="chatPanel"
-        v-if="selectedNodeId || isNewRootMode" 
+        v-if="(selectedNodeId || isNewRootMode) && !hasMultipleNodesSelected" 
         class="border-l border-white/15 flex flex-col card-material relative"
         :style="{ width: `${chatPanelWidth}px` }"
       >
@@ -224,11 +226,13 @@ const showMessageViewer = ref(false);
 const showHelp = ref(false);
 const viewingMessage = ref<MessageNode | null>(null);
 const isNewRootMode = ref(false);
+const hasMultipleNodesSelected = ref(false);
 
 // Resizable chat panel
 const chatPanelWidth = ref(400);
 const isResizing = ref(false);
 const chatPanel = ref<HTMLElement | null>(null);
+const graphCanvas = ref<any>(null);
 
 // Confirmation dialogs
 const deleteConfirmation = ref({
@@ -557,6 +561,10 @@ function handlePaneClick() {
   isNewRootMode.value = false;
 }
 
+function handleSelectionChange(hasMultiple: boolean) {
+  hasMultipleNodesSelected.value = hasMultiple;
+}
+
 function handleSearch() {
   showToast('Search functionality coming soon!', 'info');
 }
@@ -655,6 +663,45 @@ function setupKeyboardShortcuts() {
       }
     }
 
+    // Ctrl/Cmd + M: Toggle minimap
+    if ((e.ctrlKey || e.metaKey) && e.key === 'm') {
+      e.preventDefault();
+      handleToggleMinimap();
+    }
+
+    // Ctrl/Cmd + +/=: Zoom in
+    if ((e.ctrlKey || e.metaKey) && (e.key === '+' || e.key === '=')) {
+      e.preventDefault();
+      handleZoomIn();
+    }
+
+    // Ctrl/Cmd + -: Zoom out
+    if ((e.ctrlKey || e.metaKey) && e.key === '-') {
+      e.preventDefault();
+      handleZoomOut();
+    }
+
+    // Ctrl/Cmd + 0: Reset zoom
+    if ((e.ctrlKey || e.metaKey) && e.key === '0') {
+      e.preventDefault();
+      handleZoomReset();
+    }
+
+    // Ctrl/Cmd + A: Select all nodes
+    if ((e.ctrlKey || e.metaKey) && e.key === 'a' && !isTyping) {
+      e.preventDefault();
+      handleSelectAllNodes();
+    }
+
+    // Ctrl/Cmd + Enter: Send message (when chat input is focused)
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && isTyping) {
+      e.preventDefault();
+      const chatForm = document.querySelector('form') as HTMLFormElement;
+      if (chatForm) {
+        chatForm.requestSubmit();
+      }
+    }
+
     // Escape: Close modals or deselect
     if (e.key === 'Escape') {
       if (showHelp.value || showSettings.value || showRiverDashboard.value || showMessageViewer.value) {
@@ -723,6 +770,61 @@ function setupKeyboardShortcuts() {
       }
     }
   });
+}
+
+// Graph control functions
+function handleZoomIn() {
+  if (graphCanvas.value?.$el) {
+    const zoomInButton = graphCanvas.value.$el.querySelector('.vue-flow__controls-zoom-in');
+    if (zoomInButton) {
+      zoomInButton.click();
+    }
+  }
+}
+
+function handleZoomOut() {
+  if (graphCanvas.value?.$el) {
+    const zoomOutButton = graphCanvas.value.$el.querySelector('.vue-flow__controls-zoom-out');
+    if (zoomOutButton) {
+      zoomOutButton.click();
+    }
+  }
+}
+
+function handleZoomReset() {
+  if (graphCanvas.value?.$el) {
+    const fitViewButton = graphCanvas.value.$el.querySelector('.vue-flow__controls-fitview');
+    if (fitViewButton) {
+      fitViewButton.click();
+    }
+  }
+}
+
+function handleToggleMinimap() {
+  if (graphCanvas.value?.$el) {
+    const minimap = graphCanvas.value.$el.querySelector('.vue-flow__minimap');
+    if (minimap) {
+      minimap.style.display = minimap.style.display === 'none' ? 'block' : 'none';
+    }
+  }
+}
+
+function handleSelectAllNodes() {
+  if (currentRiver.value && graphCanvas.value?.$el) {
+    const nodeElements = graphCanvas.value.$el.querySelectorAll('.vue-flow__node');
+    nodeElements.forEach((node: HTMLElement) => {
+      node.classList.add('selected');
+      // Trigger a click with ctrl key held
+      const event = new MouseEvent('click', {
+        bubbles: true,
+        cancelable: true,
+        ctrlKey: true,
+        metaKey: true,
+      });
+      node.dispatchEvent(event);
+    });
+    showToast(`Selected ${nodeElements.length} nodes`, 'info');
+  }
 }
 </script>
 

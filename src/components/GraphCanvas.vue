@@ -1,5 +1,5 @@
 <template>
-  <div class="graph-canvas">
+  <div class="graph-canvas" ref="canvasContainer">
     <VueFlow
       v-model:nodes="flowNodes"
       v-model:edges="flowEdges"
@@ -30,6 +30,18 @@
         />
       </template>
     </VueFlow>
+
+    <!-- Selection Rectangle -->
+    <div
+      v-if="selectionBox.active"
+      class="selection-rectangle"
+      :style="{
+        left: `${selectionBox.x}px`,
+        top: `${selectionBox.y}px`,
+        width: `${selectionBox.width}px`,
+        height: `${selectionBox.height}px`,
+      }"
+    ></div>
 
     <!-- Context Menu -->
     <div
@@ -98,7 +110,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed, nextTick } from 'vue';
+import { ref, watch, computed, nextTick, onMounted, onUnmounted } from 'vue';
 import { VueFlow, useVueFlow } from '@vue-flow/core';
 import { Background } from '@vue-flow/background';
 import { Controls } from '@vue-flow/controls';
@@ -131,16 +143,40 @@ interface Emits {
   (e: 'update-positions-batch', updates: Array<{ nodeId: string; position: { x: number; y: number } }>): void;
   (e: 'create-root-node'): void;
   (e: 'pane-click'): void;
+  (e: 'selection-change', hasMultipleSelected: boolean): void;
 }
 
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
-const { getSelectedNodes } = useVueFlow();
+const { getSelectedNodes, project, vueFlowRef } = useVueFlow();
 
 // Track nodes being dragged to batch position updates
 const draggedNodes = ref<Set<string>>(new Set());
 const isDragging = ref(false);
+
+// Selection box state
+const canvasContainer = ref<HTMLElement | null>(null);
+const selectionBox = ref({
+  active: false,
+  startX: 0,
+  startY: 0,
+  x: 0,
+  y: 0,
+  width: 0,
+  height: 0,
+});
+const isRightDragging = ref(false);
+
+// Watch for selection changes and emit to parent
+watch(
+  () => getSelectedNodes.value,
+  (selectedNodes) => {
+    const hasMultipleSelected = (selectedNodes?.length || 0) > 1;
+    emit('selection-change', hasMultipleSelected);
+  },
+  { deep: true }
+);
 
 const contextMenu = ref({
   visible: false,
@@ -289,6 +325,154 @@ function layoutTree(
 // Auto-fit view disabled to avoid distracting zoom behavior
 // Users can manually zoom using the controls
 
+// Selection box handlers
+function startSelectionBox(event: MouseEvent) {
+  // Only start selection on right-click
+  if (event.button !== 2) return;
+  
+  const rect = canvasContainer.value?.getBoundingClientRect();
+  if (!rect) return;
+  
+  isRightDragging.value = false;
+  
+  selectionBox.value = {
+    active: true,
+    startX: event.clientX - rect.left,
+    startY: event.clientY - rect.top,
+    x: event.clientX - rect.left,
+    y: event.clientY - rect.top,
+    width: 0,
+    height: 0,
+  };
+  
+  // Add event listeners
+  document.addEventListener('mousemove', updateSelectionBox);
+  document.addEventListener('mouseup', endSelectionBox);
+  document.addEventListener('contextmenu', preventContextMenu);
+}
+
+function preventContextMenu(event: Event) {
+  if (isRightDragging.value) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  document.removeEventListener('contextmenu', preventContextMenu);
+}
+
+function updateSelectionBox(event: MouseEvent) {
+  if (!selectionBox.value.active) return;
+  
+  const rect = canvasContainer.value?.getBoundingClientRect();
+  if (!rect) return;
+  
+  const currentX = event.clientX - rect.left;
+  const currentY = event.clientY - rect.top;
+  
+  const minX = Math.min(selectionBox.value.startX, currentX);
+  const minY = Math.min(selectionBox.value.startY, currentY);
+  const maxX = Math.max(selectionBox.value.startX, currentX);
+  const maxY = Math.max(selectionBox.value.startY, currentY);
+  
+  selectionBox.value.x = minX;
+  selectionBox.value.y = minY;
+  selectionBox.value.width = maxX - minX;
+  selectionBox.value.height = maxY - minY;
+  
+  // If we've dragged more than 5 pixels, consider it a drag
+  const dragDistance = Math.sqrt(
+    Math.pow(currentX - selectionBox.value.startX, 2) + 
+    Math.pow(currentY - selectionBox.value.startY, 2)
+  );
+  
+  if (dragDistance > 5) {
+    isRightDragging.value = true;
+  }
+}
+
+function endSelectionBox(event: MouseEvent) {
+  if (!selectionBox.value.active) return;
+  
+  const wasDragging = isRightDragging.value;
+  
+  // Only select nodes if we actually dragged
+  if (wasDragging) {
+    // Prevent context menu from showing
+    event.preventDefault();
+    event.stopPropagation();
+    
+    // Select nodes within the selection box
+    selectNodesInBox();
+    
+    // Set a flag to prevent context menu from showing
+    // We'll clear this flag after a short delay
+    setTimeout(() => {
+      isRightDragging.value = false;
+    }, 100);
+  } else {
+    isRightDragging.value = false;
+  }
+  
+  // Reset selection box
+  selectionBox.value.active = false;
+  
+  // Remove event listeners
+  document.removeEventListener('mousemove', updateSelectionBox);
+  document.removeEventListener('mouseup', endSelectionBox);
+  document.removeEventListener('contextmenu', preventContextMenu);
+}
+
+function selectNodesInBox() {
+  if (!selectionBox.value.active || !vueFlowRef.value) return;
+  
+  const rect = canvasContainer.value?.getBoundingClientRect();
+  if (!rect) return;
+  
+  // Convert selection box coordinates from screen space to flow space
+  const boxMinScreen = {
+    x: selectionBox.value.x,
+    y: selectionBox.value.y,
+  };
+  const boxMaxScreen = {
+    x: selectionBox.value.x + selectionBox.value.width,
+    y: selectionBox.value.y + selectionBox.value.height,
+  };
+  
+  // Project screen coordinates to flow coordinates
+  const boxMin = project(boxMinScreen);
+  const boxMax = project(boxMaxScreen);
+  
+  // Find node IDs within the selection box
+  const nodeIdsToSelect: string[] = [];
+  
+  flowNodes.value.forEach((node) => {
+    const nodeLeft = node.position.x;
+    const nodeTop = node.position.y;
+    // Approximate node dimensions (actual node size may vary)
+    const nodeWidth = 300;
+    const nodeHeight = 100;
+    const nodeRight = nodeLeft + nodeWidth;
+    const nodeBottom = nodeTop + nodeHeight;
+    
+    // Check if node intersects with selection box
+    const intersects =
+      nodeLeft < boxMax.x &&
+      nodeRight > boxMin.x &&
+      nodeTop < boxMax.y &&
+      nodeBottom > boxMin.y;
+    
+    if (intersects) {
+      nodeIdsToSelect.push(node.id);
+    }
+  });
+  
+  // Update selection by setting the selected property on nodes
+  flowNodes.value.forEach((node) => {
+    // Use type assertion to modify the node
+    const internalNode = node as any;
+    internalNode.selected = nodeIdsToSelect.includes(node.id);
+  });
+}
+
 // Event handlers
 function handleNodeClick(event: any) {
   const nodeId = event.node?.id || event.data?.id;
@@ -326,10 +510,16 @@ function handleNodeContextMenu(event: any) {
 function handlePaneClick() {
   emit('node-select', null);
   emit('pane-click');
+  emit('selection-change', false);
   closeContextMenu();
 }
 
 function handlePaneContextMenu(event: any) {
+  // Don't show context menu if we just completed a drag selection
+  if (isRightDragging.value) {
+    return;
+  }
+  
   const mouseEvent = event.event || event;
   
   if (mouseEvent) {
@@ -468,6 +658,34 @@ function handleClickOutside(event: MouseEvent) {
 if (typeof window !== 'undefined') {
   window.addEventListener('click', handleClickOutside);
 }
+
+// Setup selection box on pane
+// We need to detect right-click on the pane to start selection box
+let cleanupSelectionListener: (() => void) | null = null;
+
+onMounted(() => {
+  // Find the Vue Flow pane element
+  const paneElement = document.querySelector('.vue-flow__pane');
+  
+  if (paneElement) {
+    paneElement.addEventListener('mousedown', startSelectionBox as EventListener);
+    
+    cleanupSelectionListener = () => {
+      paneElement.removeEventListener('mousedown', startSelectionBox as EventListener);
+    };
+  }
+});
+
+onUnmounted(() => {
+  if (cleanupSelectionListener) {
+    cleanupSelectionListener();
+  }
+  
+  // Clean up any lingering event listeners
+  document.removeEventListener('mousemove', updateSelectionBox);
+  document.removeEventListener('mouseup', endSelectionBox);
+  document.removeEventListener('contextmenu', preventContextMenu);
+});
 </script>
 
 <style scoped>
@@ -529,6 +747,15 @@ if (typeof window !== 'undefined') {
 
 :deep(.vue-flow__controls-button:last-child) {
   border-bottom: none;
+}
+
+.selection-rectangle {
+  position: absolute;
+  border: 2px solid rgba(74, 158, 255, 0.8);
+  background: rgba(74, 158, 255, 0.15);
+  pointer-events: none;
+  z-index: 1000;
+  backdrop-filter: blur(2px);
 }
 </style>
 
