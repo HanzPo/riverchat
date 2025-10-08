@@ -14,7 +14,7 @@
       @pane-click="handlePaneClick"
       @pane-context-menu="handlePaneContextMenu"
     >
-      <Background variant="lines" pattern-color="rgba(255, 255, 255, 0.12)" :gap="40" />
+      <Background variant="dots" pattern-color="#808080" :gap="30" />
       <Controls />
       <MiniMap />
 
