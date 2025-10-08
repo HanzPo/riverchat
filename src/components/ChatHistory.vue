@@ -148,10 +148,9 @@
         ref="textareaRef"
         v-model="inputText"
         class="textarea-material text-[13.5px]"
-        :placeholder="branchContext.text ? 'Ask about the selected text...' : 'Type your message... (Ctrl+Enter to send)'"
+        :placeholder="branchContext.text ? 'Ask about the selected text...' : 'Type your message... (Enter to send, Ctrl+Enter for newline)'"
         rows="3"
-        @keydown.ctrl.enter="handleSend"
-        @keydown.meta.enter="handleSend"
+        @keydown="handleKeydown"
       ></textarea>
 
       <div class="flex justify-end gap-2 mt-3">
@@ -310,6 +309,21 @@ watch(
   },
   { immediate: true }
 );
+
+function handleKeydown(event: KeyboardEvent) {
+  // Handle Enter key
+  if (event.key === 'Enter') {
+    // Ctrl+Enter or Cmd+Enter: insert newline (default behavior)
+    if (event.ctrlKey || event.metaKey) {
+      // Allow default textarea behavior to insert newline
+      return;
+    }
+    
+    // Plain Enter: send message
+    event.preventDefault();
+    handleSend();
+  }
+}
 
 function handleSend() {
   if (inputText.value.trim() && selectedModel.value && canSend.value) {

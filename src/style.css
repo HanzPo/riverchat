@@ -143,6 +143,11 @@
   @apply hover:bg-error/20 hover:text-error;
 }
 
+.context-menu-item-header {
+  @apply cursor-default text-xs uppercase tracking-wider opacity-60 font-bold
+         hover:bg-transparent;
+}
+
 /* Toast */
 .toast {
   @apply fixed top-20 left-6 px-5 py-3.5 rounded-lg z-[9999] shadow-elevation-4 font-medium text-sm;

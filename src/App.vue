@@ -12,13 +12,16 @@
       </div>
 
       <div class="flex gap-3">
-        <button @click="showRiverDashboard = true" class="btn-material" title="Manage Rivers">
+        <button @click="showRiverDashboard = true" class="btn-material" title="Manage Rivers (Ctrl+K)">
           📂 Rivers
         </button>
         <button @click="handleSearch" class="btn-material" title="Search (Ctrl+F)">
           🔍
         </button>
-        <button @click="showSettings = true" class="btn-material" title="Settings">
+        <button @click="showHelp = true" class="btn-material" title="Keyboard Shortcuts (Ctrl+?)">
+          ❓
+        </button>
+        <button @click="showSettings = true" class="btn-material" title="Settings (Ctrl+,)">
           ⚙️
         </button>
       </div>
@@ -39,7 +42,9 @@
           @regenerate="handleRegenerate"
           @edit-resubmit="handleEditResubmit"
           @delete-branch="handleDeleteBranch"
+          @delete-branches-batch="handleDeleteBranchesBatch"
           @update-position="handleUpdatePosition"
+          @update-positions-batch="handleUpdatePositionsBatch"
           @copy-message="handleCopyMessage"
           @create-root-node="handleCreateRootNode"
           @pane-click="handlePaneClick"
@@ -72,6 +77,7 @@
 
       <!-- Right Panel: Chat History -->
       <div 
+        ref="chatPanel"
         v-if="selectedNodeId || isNewRootMode" 
         class="border-l border-white/15 flex flex-col card-material relative"
         :style="{ width: `${chatPanelWidth}px` }"
@@ -149,6 +155,22 @@
       @close="editConfirmation.isOpen = false"
     />
 
+    <ConfirmationModal
+      :is-open="deleteBatchConfirmation.isOpen"
+      title="Delete Multiple Nodes?"
+      :message="`Are you sure you want to delete ${deleteBatchConfirmation.nodeIds.length} selected nodes? All messages in these branches and their children will be permanently deleted.`"
+      confirm-text="Delete All"
+      cancel-text="Cancel"
+      :is-dangerous="true"
+      @confirm="confirmDeleteBranchesBatch"
+      @close="deleteBatchConfirmation.isOpen = false"
+    />
+
+    <KeyboardShortcutsModal
+      :is-open="showHelp"
+      @close="showHelp = false"
+    />
+
     <!-- Toast Notification -->
     <div v-if="toast.visible" class="toast" :class="`toast-${toast.type}`">
       {{ toast.message }}
@@ -168,6 +190,7 @@ import SettingsModal from './components/SettingsModal.vue';
 import RiverDashboard from './components/RiverDashboard.vue';
 import MessageViewerModal from './components/MessageViewerModal.vue';
 import ConfirmationModal from './components/ConfirmationModal.vue';
+import KeyboardShortcutsModal from './components/KeyboardShortcutsModal.vue';
 
 const {
   currentRiver,
@@ -185,6 +208,7 @@ const {
   deleteNode,
   updateNodeContent,
   updateNodePosition,
+  updateNodePositionsBatch,
   getPathToNode,
   updateSettings,
   updateAPIKeys,
@@ -197,17 +221,24 @@ const showWelcome = ref(false);
 const showSettings = ref(false);
 const showRiverDashboard = ref(false);
 const showMessageViewer = ref(false);
+const showHelp = ref(false);
 const viewingMessage = ref<MessageNode | null>(null);
 const isNewRootMode = ref(false);
 
 // Resizable chat panel
 const chatPanelWidth = ref(400);
 const isResizing = ref(false);
+const chatPanel = ref<HTMLElement | null>(null);
 
 // Confirmation dialogs
 const deleteConfirmation = ref({
   isOpen: false,
   nodeId: '',
+});
+
+const deleteBatchConfirmation = ref({
+  isOpen: false,
+  nodeIds: [] as string[],
 });
 
 const editConfirmation = ref({
@@ -231,23 +262,26 @@ const currentPath = computed(() => {
 // Resize functionality
 function startResize(e: MouseEvent) {
   e.preventDefault();
+  if (!chatPanel.value) return;
+  
   isResizing.value = true;
   
   // Add styles to prevent text selection and improve performance during drag
   document.body.style.cursor = 'col-resize';
   document.body.style.userSelect = 'none';
   
+  const panelElement = chatPanel.value;
+  
   const onMouseMove = (moveEvent: MouseEvent) => {
-    if (!isResizing.value) return;
+    // Calculate new width from right edge
+    const newWidth = window.innerWidth - moveEvent.clientX;
     
-    // Use requestAnimationFrame for smooth updates
-    requestAnimationFrame(() => {
-      // Calculate new width from right edge
-      const newWidth = window.innerWidth - moveEvent.clientX;
-      
-      // Clamp between min and max widths
-      chatPanelWidth.value = Math.max(300, Math.min(800, newWidth));
-    });
+    // Clamp between min and max widths
+    const clampedWidth = Math.max(300, Math.min(800, newWidth));
+    
+    // Use direct DOM manipulation for instant response
+    // This bypasses Vue's reactivity system completely
+    panelElement.style.width = `${clampedWidth}px`;
   };
   
   const onMouseUp = () => {
@@ -257,8 +291,12 @@ function startResize(e: MouseEvent) {
     document.body.style.cursor = '';
     document.body.style.userSelect = '';
     
-    // Save to session storage only once when done
-    sessionStorage.setItem('chatPanelWidth', chatPanelWidth.value.toString());
+    // Now update the reactive state once at the end
+    const finalWidth = parseInt(panelElement.style.width, 10);
+    chatPanelWidth.value = finalWidth;
+    
+    // Save to session storage
+    sessionStorage.setItem('chatPanelWidth', finalWidth.toString());
     
     document.removeEventListener('mousemove', onMouseMove);
     document.removeEventListener('mouseup', onMouseUp);
@@ -394,8 +432,8 @@ async function handleRegenerate(parentNodeId: string) {
   };
 
   try {
-    await generateAIResponse(parentNodeId, model);
     showToast('Generating new response...', 'info');
+    await generateAIResponse(parentNodeId, model);
   } catch (error) {
     showToast('Failed to regenerate response', 'error');
   }
@@ -446,12 +484,52 @@ function handleDeleteBranch(nodeId: string) {
   };
 }
 
+function handleDeleteBranchesBatch(nodeIds: string[]) {
+  deleteBatchConfirmation.value = {
+    isOpen: true,
+    nodeIds,
+  };
+}
+
 function confirmDeleteBranch() {
   const nodeId = deleteConfirmation.value.nodeId;
   if (nodeId) {
     deleteNode(nodeId);
     showToast('Branch deleted', 'success');
   }
+}
+
+function confirmDeleteBranchesBatch() {
+  const nodeIds = deleteBatchConfirmation.value.nodeIds;
+  if (nodeIds.length > 0 && currentRiver.value) {
+    // Filter out nodes that are descendants of other nodes in the selection
+    // This prevents trying to delete nodes that will already be deleted as descendants
+    const nodeIdsSet = new Set(nodeIds);
+    const nodesToDelete = nodeIds.filter(nodeId => {
+      const node = currentRiver.value!.nodes[nodeId];
+      if (!node) return false;
+      
+      // Check if any ancestor of this node is also in the selection
+      let currentParentId = node.parentId;
+      while (currentParentId) {
+        if (nodeIdsSet.has(currentParentId)) {
+          // An ancestor is in the selection, so skip this node (it will be deleted with its ancestor)
+          return false;
+        }
+        const parentNode = currentRiver.value!.nodes[currentParentId];
+        currentParentId = parentNode?.parentId || null;
+      }
+      return true;
+    });
+    
+    // Delete only the top-level selected nodes (descendants will be deleted automatically)
+    nodesToDelete.forEach(nodeId => {
+      deleteNode(nodeId);
+    });
+    
+    showToast(`Deleted ${nodeIds.length} nodes`, 'success');
+  }
+  deleteBatchConfirmation.value.isOpen = false;
 }
 
 function handleCopyMessage(content: string) {
@@ -461,6 +539,11 @@ function handleCopyMessage(content: string) {
 
 function handleUpdatePosition(nodeId: string, position: { x: number; y: number }) {
   updateNodePosition(nodeId, position);
+}
+
+function handleUpdatePositionsBatch(updates: Array<{ nodeId: string; position: { x: number; y: number } }>) {
+  // Update all positions in a single batch to avoid multiple reactive updates
+  updateNodePositionsBatch(updates);
 }
 
 function handleCreateRootNode() {
@@ -505,6 +588,16 @@ function showToast(message: string, type: 'info' | 'success' | 'error' = 'info')
 // Keyboard Shortcuts
 function setupKeyboardShortcuts() {
   window.addEventListener('keydown', (e) => {
+    // Check if user is typing in an input/textarea
+    const isTyping = (e.target as HTMLElement)?.tagName === 'INPUT' || 
+                     (e.target as HTMLElement)?.tagName === 'TEXTAREA';
+
+    // Ctrl/Cmd + ?: Show keyboard shortcuts help
+    if ((e.ctrlKey || e.metaKey) && e.key === '?') {
+      e.preventDefault();
+      showHelp.value = true;
+    }
+
     // Ctrl/Cmd + K: Open rivers dashboard
     if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
       e.preventDefault();
@@ -523,11 +616,111 @@ function setupKeyboardShortcuts() {
       handleSearch();
     }
 
-    // Escape: Close modals
+    // Ctrl/Cmd + N: Create new river
+    if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+      e.preventDefault();
+      showRiverDashboard.value = true;
+    }
+
+    // Ctrl/Cmd + R: Create new root node
+    if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
+      e.preventDefault();
+      if (currentRiver.value) {
+        handleCreateRootNode();
+      }
+    }
+
+    // Ctrl/Cmd + D: Deselect node
+    if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
+      e.preventDefault();
+      selectNode(null);
+      isNewRootMode.value = false;
+    }
+
+    // Ctrl/Cmd + ]: Toggle chat panel (close if open)
+    if ((e.ctrlKey || e.metaKey) && e.key === ']') {
+      e.preventDefault();
+      if (selectedNodeId.value || isNewRootMode.value) {
+        selectNode(null);
+        isNewRootMode.value = false;
+      }
+    }
+
+    // Ctrl/Cmd + [: Focus chat input
+    if ((e.ctrlKey || e.metaKey) && e.key === '[') {
+      e.preventDefault();
+      const chatInput = document.querySelector('textarea') as HTMLTextAreaElement;
+      if (chatInput) {
+        chatInput.focus();
+      }
+    }
+
+    // Escape: Close modals or deselect
     if (e.key === 'Escape') {
-      showSettings.value = false;
-      showRiverDashboard.value = false;
-      showMessageViewer.value = false;
+      if (showHelp.value || showSettings.value || showRiverDashboard.value || showMessageViewer.value) {
+        showHelp.value = false;
+        showSettings.value = false;
+        showRiverDashboard.value = false;
+        showMessageViewer.value = false;
+      } else if (selectedNodeId.value || isNewRootMode.value) {
+        selectNode(null);
+        isNewRootMode.value = false;
+      }
+    }
+
+    // Actions that require a selected node
+    if (selectedNodeId.value && currentRiver.value) {
+      const currentNode = currentRiver.value.nodes[selectedNodeId.value];
+
+      // Ctrl/Cmd + B: Branch from selected node
+      if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+        e.preventDefault();
+        handleBranchFrom(selectedNodeId.value);
+        showToast('Branch from this node by sending a new message', 'info');
+      }
+
+      // Ctrl/Cmd + G: Regenerate AI response
+      if ((e.ctrlKey || e.metaKey) && e.key === 'g') {
+        e.preventDefault();
+        if (currentNode?.type === 'ai' && currentNode.parentId) {
+          handleRegenerate(currentNode.parentId);
+        } else {
+          showToast('Can only regenerate AI responses', 'error');
+        }
+      }
+
+      // Ctrl/Cmd + E: Edit & resubmit
+      if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
+        e.preventDefault();
+        if (currentNode?.type === 'user') {
+          handleEditResubmit(selectedNodeId.value);
+        } else {
+          showToast('Can only edit user messages', 'error');
+        }
+      }
+
+      // Ctrl/Cmd + C: Copy message (only if not typing)
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c' && !isTyping) {
+        e.preventDefault();
+        if (currentNode) {
+          handleCopyMessage(currentNode.content);
+        }
+      }
+
+      // Ctrl/Cmd + V: View full message (only if not typing)
+      if ((e.ctrlKey || e.metaKey) && e.key === 'v' && !isTyping) {
+        e.preventDefault();
+        if (currentNode) {
+          viewingMessage.value = currentNode;
+          showMessageViewer.value = true;
+        }
+      }
+
+      // Ctrl/Cmd + Delete: Delete branch
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Delete') {
+        e.preventDefault();
+        handleDeleteBranch(selectedNodeId.value);
+      }
     }
   });
 }

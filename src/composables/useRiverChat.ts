@@ -1,4 +1,4 @@
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, nextTick } from 'vue';
 import { v4 as uuidv4 } from 'uuid';
 import type { River, MessageNode, LLMModel, Settings } from '../types';
 import { StorageService } from '../services/storage';
@@ -381,6 +381,17 @@ export function useRiverChat() {
     }
   }
 
+  function updateNodePositionsBatch(updates: Array<{ nodeId: string; position: { x: number; y: number } }>): void {
+    if (!currentRiver.value) return;
+    // Update all positions in a single operation to minimize reactivity triggers
+    updates.forEach(({ nodeId, position }) => {
+      const node = currentRiver.value!.nodes[nodeId];
+      if (node) {
+        node.position = position;
+      }
+    });
+  }
+
   function getPathToNode(nodeId: string): MessageNode[] {
     if (!currentRiver.value) return [];
 
@@ -451,6 +462,7 @@ export function useRiverChat() {
     deleteNode,
     updateNodeContent,
     updateNodePosition,
+    updateNodePositionsBatch,
     getPathToNode,
     getChildren,
 

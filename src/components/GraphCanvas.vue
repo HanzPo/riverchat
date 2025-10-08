@@ -10,6 +10,8 @@
       @node-click="handleNodeClick"
       @node-double-click="handleNodeDoubleClick"
       @node-context-menu="handleNodeContextMenu"
+      @node-drag-start="handleNodeDragStart"
+      @node-drag="handleNodeDrag"
       @node-drag-stop="handleNodeDragStop"
       @pane-click="handlePaneClick"
       @pane-context-menu="handlePaneContextMenu"
@@ -40,13 +42,24 @@
       @click="closeContextMenu"
     >
       <!-- Pane Context Menu (when no node is selected) -->
-      <template v-if="!contextMenu.node">
+      <template v-if="!contextMenu.node && contextMenu.selectedNodes.length === 0">
         <div class="context-menu-item" @click="handleCreateRootNode">
           ➕ New Root Node
         </div>
       </template>
 
-      <!-- Node Context Menu -->
+      <!-- Multiple Nodes Selected -->
+      <template v-else-if="contextMenu.selectedNodes.length > 1">
+        <div class="context-menu-item context-menu-item-header">
+          {{ contextMenu.selectedNodes.length }} Nodes Selected
+        </div>
+        
+        <div class="context-menu-item context-menu-item-danger" @click="handleDeleteMultipleNodes">
+          🗑️ Delete Selected Nodes
+        </div>
+      </template>
+
+      <!-- Single Node Context Menu -->
       <template v-else>
         <div
           v-if="contextMenu.node?.type === 'user'"
@@ -85,7 +98,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue';
+import { ref, watch, computed, nextTick } from 'vue';
 import { VueFlow, useVueFlow } from '@vue-flow/core';
 import { Background } from '@vue-flow/background';
 import { Controls } from '@vue-flow/controls';
@@ -112,8 +125,10 @@ interface Emits {
   (e: 'regenerate', nodeId: string): void;
   (e: 'edit-resubmit', nodeId: string): void;
   (e: 'delete-branch', nodeId: string): void;
+  (e: 'delete-branches-batch', nodeIds: string[]): void;
   (e: 'copy-message', content: string): void;
   (e: 'update-position', nodeId: string, position: { x: number; y: number }): void;
+  (e: 'update-positions-batch', updates: Array<{ nodeId: string; position: { x: number; y: number } }>): void;
   (e: 'create-root-node'): void;
   (e: 'pane-click'): void;
 }
@@ -121,36 +136,65 @@ interface Emits {
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
-const { fitView } = useVueFlow();
+const { getSelectedNodes } = useVueFlow();
+
+// Track nodes being dragged to batch position updates
+const draggedNodes = ref<Set<string>>(new Set());
+const isDragging = ref(false);
 
 const contextMenu = ref({
   visible: false,
   x: 0,
   y: 0,
   node: null as MessageNode | null,
+  selectedNodes: [] as MessageNode[],
 });
 
-// Convert nodes to Vue Flow format
-const flowNodes = computed<VueFlowNode[]>(() => {
-  const result: VueFlowNode[] = [];
+// Use a ref instead of computed to avoid interfering with VueFlow's drag handling
+const flowNodes = ref<VueFlowNode[]>([]);
+
+// Function to sync flow nodes from props
+function syncFlowNodes() {
+  // Don't sync during drag to avoid interfering with VueFlow's position management
+  if (isDragging.value) return;
+  
   const nodeMap = props.nodes;
   
   // Calculate positions - use stored positions when available, otherwise calculate
   const positions = calculatePositions(nodeMap, props.rootNodeId);
 
+  // Build a map of current flow nodes for easy lookup
+  const currentFlowNodesMap = new Map(flowNodes.value.map(n => [n.id, n]));
+  
+  const result: VueFlowNode[] = [];
+
   Object.values(nodeMap).forEach((node) => {
     const pos = node.position || positions[node.id] || { x: 0, y: 0 };
     
-    result.push({
-      id: node.id,
-      type: 'custom',
-      position: pos,
-      data: node,
-    });
+    // Check if this node already exists in flowNodes
+    const existingNode = currentFlowNodesMap.get(node.id);
+    
+    if (existingNode) {
+      // Update existing node in-place to preserve VueFlow's internal references
+      existingNode.position = pos;
+      existingNode.data = node;
+      result.push(existingNode);
+    } else {
+      // New node - create it
+      result.push({
+        id: node.id,
+        type: 'custom',
+        position: pos,
+        data: node,
+      });
+    }
   });
 
-  return result;
-});
+  flowNodes.value = result;
+}
+
+// Watch for changes in props.nodes and sync (but not during drag)
+watch(() => props.nodes, syncFlowNodes, { deep: true, immediate: true });
 
 // Convert edges
 const flowEdges = computed<VueFlowEdge[]>(() => {
@@ -242,12 +286,8 @@ function layoutTree(
   return positions;
 }
 
-// Watch for changes and fit view
-watch([flowNodes, flowEdges], () => {
-  setTimeout(() => {
-    fitView({ padding: 0.2, duration: 300 });
-  }, 100);
-});
+// Auto-fit view disabled to avoid distracting zoom behavior
+// Users can manually zoom using the controls
 
 // Event handlers
 function handleNodeClick(event: any) {
@@ -269,11 +309,16 @@ function handleNodeContextMenu(event: any) {
   const node = event.node?.data || event.data;
   
   if (node && mouseEvent) {
+    // Check if multiple nodes are selected
+    const selectedNodes = getSelectedNodes.value || [];
+    const selectedNodesData = selectedNodes.map(n => n.data as MessageNode);
+    
     contextMenu.value = {
       visible: true,
       x: mouseEvent.clientX,
       y: mouseEvent.clientY,
       node,
+      selectedNodes: selectedNodesData.length > 1 ? selectedNodesData : [],
     };
   }
 }
@@ -293,16 +338,68 @@ function handlePaneContextMenu(event: any) {
       x: mouseEvent.clientX,
       y: mouseEvent.clientY,
       node: null, // No node selected for pane context menu
+      selectedNodes: [],
     };
   }
 }
 
-function handleNodeDragStop(event: any) {
+function handleNodeDragStart() {
+  // Mark that dragging has started - this prevents syncFlowNodes from running
+  isDragging.value = true;
+  draggedNodes.value.clear();
+}
+
+function handleNodeDrag() {
+  // During drag, VueFlow handles positions internally
+  // We don't need to do anything here
+}
+
+async function handleNodeDragStop(event: any) {
   const nodeId = event.node?.id;
   const position = event.node?.position;
   
-  if (nodeId && position) {
+  if (!nodeId || !position) return;
+
+  // Get all currently selected nodes from VueFlow
+  const selectedNodes = getSelectedNodes.value || [];
+  
+  // If multiple nodes are selected, batch update all of them
+  if (selectedNodes.length > 1) {
+    // Add this node to the dragged nodes set
+    draggedNodes.value.add(nodeId);
+    
+    // Check if we've received drag-stop events for all selected nodes
+    const allSelectedIds = selectedNodes.map(n => n.id);
+    const allDragged = allSelectedIds.every(id => draggedNodes.value.has(id));
+    
+    if (allDragged) {
+      // All selected nodes have finished dragging, collect all positions from VueFlow
+      const updates = selectedNodes
+        .filter(node => node.position)
+        .map(node => ({
+          nodeId: node.id,
+          position: { x: node.position!.x, y: node.position!.y }
+        }));
+      
+      // Emit a single batch update event
+      emit('update-positions-batch', updates);
+      
+      // Clear the dragged nodes set
+      draggedNodes.value.clear();
+      
+      // Wait for Vue to process the update before allowing sync
+      await nextTick();
+      await nextTick(); // Double nextTick to ensure props have propagated
+      isDragging.value = false;
+    }
+  } else {
+    // Single node drag - update immediately
     emit('update-position', nodeId, { x: position.x, y: position.y });
+    
+    // Wait for Vue to process the update before allowing sync
+    await nextTick();
+    await nextTick(); // Double nextTick to ensure props have propagated
+    isDragging.value = false;
   }
 }
 
@@ -332,6 +429,14 @@ function handleEditAndResubmit() {
 function handleDeleteBranch() {
   if (contextMenu.value.node) {
     emit('delete-branch', contextMenu.value.node.id);
+  }
+}
+
+function handleDeleteMultipleNodes() {
+  if (contextMenu.value.selectedNodes.length > 0) {
+    // Collect all node IDs and emit as a batch
+    const nodeIds = contextMenu.value.selectedNodes.map(node => node.id);
+    emit('delete-branches-batch', nodeIds);
   }
 }
 
