@@ -1,4 +1,4 @@
-import { ref, computed, watch, nextTick } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { v4 as uuidv4 } from 'uuid';
 import type { River, MessageNode, LLMModel, Settings } from '../types';
 import { StorageService } from '../services/storage';
