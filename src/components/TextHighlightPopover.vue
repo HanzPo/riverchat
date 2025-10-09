@@ -38,14 +38,13 @@ defineEmits<Emits>();
   z-index: 10000;
   display: flex;
   gap: 4px;
-  background: rgba(10, 10, 10, 0.98);
+  background: var(--color-background-elevated);
   backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   padding: 6px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6),
-              0 0 0 1px rgba(255, 255, 255, 0.1);
-  animation: popover-appear 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: var(--shadow-xl);
+  animation: popover-appear 0.15s var(--ease-in-out);
   transform: translateY(-100%) translateY(-12px);
 }
 
@@ -65,22 +64,22 @@ defineEmits<Emits>();
   align-items: center;
   gap: 6px;
   padding: 8px 12px;
-  background: rgba(74, 158, 255, 0.15);
-  border: 1px solid rgba(74, 158, 255, 0.3);
+  background: var(--color-primary-muted);
+  border: 1px solid var(--color-primary);
   border-radius: 6px;
-  color: rgba(255, 255, 255, 0.95);
+  color: var(--color-primary);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.15s var(--ease-in-out);
   white-space: nowrap;
 }
 
 .popover-button:hover {
-  background: rgba(74, 158, 255, 0.25);
-  border-color: rgba(74, 158, 255, 0.5);
+  background: rgba(13, 153, 255, 0.25);
+  border-color: var(--color-primary-hover);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(74, 158, 255, 0.3);
+  box-shadow: 0 4px 12px var(--color-primary-muted);
 }
 
 .popover-button:active {

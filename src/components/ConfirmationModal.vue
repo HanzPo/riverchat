@@ -1,21 +1,23 @@
 <template>
   <div v-if="isOpen" class="modal-backdrop" @click.self="emit('close')">
     <div class="modal-content w-[450px] p-7">
-      <h3 class="text-xl font-bold mb-3 text-white/95">
+      <h3 class="text-lg font-semibold mb-3" style="color: var(--color-text-primary); letter-spacing: -0.01em;">
         {{ title }}
       </h3>
-      <p class="text-white/80 text-[15px] leading-relaxed mb-6 font-medium">
+      <p class="text-sm leading-relaxed mb-6 font-medium" style="color: var(--color-text-secondary);">
         {{ message }}
       </p>
 
       <div class="flex justify-end gap-3">
-        <button @click="emit('close')" class="btn-material px-5 py-2.5">
+        <button @click="emit('close')" class="btn-material" style="padding: 8px 16px;">
           {{ cancelText }}
         </button>
         <button
           @click="handleConfirm"
-          class="btn-material px-5 py-2.5 font-bold"
-          :class="isDangerous ? 'bg-error/25 text-error hover:bg-error/35 border-error/40' : 'bg-primary/30 text-white/95 hover:bg-primary/40'"
+          class="btn-material"
+          :style="isDangerous 
+            ? 'padding: 8px 16px; font-weight: 600; background: var(--color-error-bg); color: var(--color-error); border-color: var(--color-error);' 
+            : 'padding: 8px 16px; font-weight: 600; background: var(--color-primary-muted); color: var(--color-primary); border-color: var(--color-primary);'"
         >
           {{ confirmText }}
         </button>

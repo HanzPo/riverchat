@@ -1,5 +1,5 @@
 <template>
-  <div class="flex flex-col h-full bg-background-paper relative">
+  <div class="flex flex-col h-full relative" style="background: var(--color-background-secondary);">
     <!-- Text Highlight Popover (render at top level for proper positioning) -->
     <Teleport to="body">
       <TextHighlightPopover
@@ -10,19 +10,20 @@
     </Teleport>
 
     <!-- Header -->
-    <div class="p-5 border-b border-white/15 card-material flex justify-between items-start gap-4">
+    <div class="p-5 flex justify-between items-start gap-4" style="border-bottom: 1px solid var(--color-border); background: var(--color-background-secondary);">
       <div class="flex-1">
-        <h2 class="text-lg font-bold text-white/95">
+        <h2 class="text-base font-semibold" style="color: var(--color-text-primary); letter-spacing: -0.01em;">
           {{ isNewRootMode ? 'New Conversation Thread' : 'Chat History' }}
         </h2>
-        <p class="text-xs text-white/70 mt-1.5 font-medium">
+        <p class="text-xs mt-1.5 font-medium" style="color: var(--color-text-tertiary);">
           {{ isNewRootMode ? 'Start a new root conversation' : `${path.length} message${path.length !== 1 ? 's' : ''} in this branch` }}
         </p>
       </div>
       <div class="flex gap-2 items-center">
         <button
           @click="$emit('pop-out')"
-          class="text-white/70 hover:text-white/95 hover:bg-white/10 transition-all p-2 rounded-md"
+          class="p-2 rounded-md transition-all"
+          style="color: var(--color-text-secondary); cursor: pointer;"
           title="Pop out chat"
         >
           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -32,7 +33,8 @@
         </button>
         <button
           @click="$emit('close')"
-          class="text-white/70 hover:text-white/95 hover:bg-white/10 transition-all p-2 rounded-md"
+          class="p-2 rounded-md transition-all"
+          style="color: var(--color-text-secondary); cursor: pointer;"
           title="Close chat"
         >
           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -45,7 +47,7 @@
     <!-- Messages -->
     <div ref="messagesContainer" class="flex-1 overflow-y-auto p-4">
       <div v-if="path.length === 0 && !isNewRootMode" class="flex items-center justify-center h-full px-5 py-10">
-        <p class="text-white/70 text-sm text-center font-medium">
+        <p class="text-xs text-center font-medium" style="color: var(--color-text-tertiary);">
           Type a message into the chat to create a new thread
         </p>
       </div>
@@ -53,10 +55,10 @@
       <div v-if="isNewRootMode" class="flex items-center justify-center h-full px-5 py-10">
         <div class="text-center">
           <div class="text-4xl mb-4">🌊</div>
-          <p class="text-white/90 text-base font-bold mb-2">
+          <p class="text-sm font-semibold mb-2" style="color: var(--color-text-primary); letter-spacing: -0.01em;">
             Start a New Thread
           </p>
-          <p class="text-white/70 text-sm font-medium">
+          <p class="text-xs font-medium" style="color: var(--color-text-tertiary);">
             This will create a new root conversation node. Type your message below to begin.
           </p>
         </div>
@@ -331,50 +333,59 @@ const canSend = computed(() => {
 watch(
   () => props.path,
   async () => {
+    // Use requestAnimationFrame for more reliable scroll timing after DOM updates
     await nextTick();
-    if (messagesContainer.value) {
-      messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
-    }
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (messagesContainer.value) {
+          messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
+        }
+      });
+    });
   },
-  { immediate: true, deep: true }
+  { immediate: true, deep: true, flush: 'post' }
 );
 
-// Autofocus textarea when entering new root mode
+// Consolidated autofocus logic - focus textarea when it becomes available
 watch(
-  () => props.isNewRootMode,
-  async (isNewRootMode) => {
-    if (isNewRootMode) {
-      await nextTick();
-      textareaRef.value?.focus();
-    }
-  },
-  { immediate: true }
-);
-
-// Autofocus textarea when an AI response is selected
-watch(
-  [() => props.selectedNodeId, () => props.path],
+  [() => props.isNewRootMode, () => props.selectedNodeId, () => props.path, canSend],
   async () => {
-    // Only focus if we can send (i.e., an AI response is selected)
-    // and we're not in new root mode (already handled above)
-    if (canSend.value && !props.isNewRootMode && props.path.length > 0) {
-      // Wait for DOM to update (multiple ticks to ensure v-else renders)
+    // Focus should happen when:
+    // 1. In new root mode, OR
+    // 2. Can send (AI response selected or empty path) and not in new root mode
+    const shouldFocus = props.isNewRootMode || (canSend.value && !props.isNewRootMode && props.path.length > 0);
+    
+    if (shouldFocus) {
+      // Use requestAnimationFrame for more reliable DOM update timing
       await nextTick();
-      await nextTick();
-      // Add a small delay to ensure the textarea is fully rendered
-      setTimeout(() => {
-        textareaRef.value?.focus();
-      }, 50);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          textareaRef.value?.focus();
+        });
+      });
     }
-  }
+  },
+  { immediate: true, flush: 'post' }
 );
 
 function handleKeydown(event: KeyboardEvent) {
   // Handle Enter key
   if (event.key === 'Enter') {
-    // Ctrl+Enter or Cmd+Enter: insert newline (default behavior)
+    // Ctrl+Enter or Cmd+Enter: insert newline
     if (event.ctrlKey || event.metaKey) {
-      // Allow default textarea behavior to insert newline
+      event.preventDefault();
+      // Manually insert newline at cursor position
+      const textarea = textareaRef.value;
+      if (textarea) {
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const value = inputText.value;
+        inputText.value = value.substring(0, start) + '\n' + value.substring(end);
+        // Restore cursor position after the newline
+        nextTick(() => {
+          textarea.selectionStart = textarea.selectionEnd = start + 1;
+        });
+      }
       return;
     }
     

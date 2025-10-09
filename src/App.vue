@@ -1,12 +1,12 @@
 <template>
-  <div class="w-screen h-screen overflow-hidden bg-background">
+  <div class="w-screen h-screen overflow-hidden" style="background: var(--color-background);">
     <!-- Top Navigation Bar -->
-    <div class="flex justify-between items-center px-5 py-3.5 border-b border-white/15 card-material">
+    <div class="flex justify-between items-center px-5 py-3" style="border-bottom: 1px solid var(--color-border); background: var(--color-background-secondary);">
       <div class="flex items-center gap-4">
-        <h1 class="text-xl font-bold text-white/95">
+        <h1 class="text-lg font-semibold" style="color: var(--color-text-primary); letter-spacing: -0.01em;">
           🌊 RiverChat
         </h1>
-        <span v-if="currentRiver" class="text-white/75 text-sm font-medium">
+        <span v-if="currentRiver" class="text-sm font-medium" style="color: var(--color-text-secondary);">
           {{ currentRiver.name }}
         </span>
       </div>
@@ -62,15 +62,15 @@
           <span>New Root Node</span>
         </button>
         
-        <div v-if="!currentRiver" class="flex items-center justify-center h-full bg-background-paper">
+        <div v-if="!currentRiver" class="flex items-center justify-center h-full" style="background: var(--color-background);">
           <div class="text-center">
-            <h2 class="text-2xl font-bold text-white/95 mb-3">
+            <h2 class="text-2xl font-semibold mb-3" style="color: var(--color-text-primary); letter-spacing: -0.02em;">
               Welcome to RiverChat
             </h2>
-            <p class="text-white/75 text-base mb-6 font-medium">
+            <p class="text-sm mb-6 font-medium" style="color: var(--color-text-secondary);">
               Create a new river to start your first conversation
             </p>
-            <button @click="handleCreateFirstRiver" class="btn-material px-6 py-3 text-base font-bold">
+            <button @click="handleCreateFirstRiver" class="btn-material" style="padding: 10px 20px; font-size: 14px; font-weight: 600;">
               + Create River
             </button>
           </div>
@@ -81,8 +81,12 @@
       <div 
         ref="chatPanel"
         v-if="(selectedNodeId || isNewRootMode) && !hasMultipleNodesSelected" 
-        class="border-l border-white/15 flex flex-col card-material relative"
-        :style="{ width: `${chatPanelWidth}px` }"
+        class="flex flex-col relative"
+        :style="{ 
+          width: `${chatPanelWidth}px`, 
+          borderLeft: '1px solid var(--color-border)',
+          background: 'var(--color-background-secondary)'
+        }"
       >
         <!-- Resize Handle -->
         <div 
@@ -867,17 +871,19 @@ function handleSelectAllNodes() {
   cursor: col-resize;
   background: transparent;
   z-index: 10;
-  transition: background-color 0.2s ease;
+  transition: background-color 0.15s ease;
   will-change: background-color;
   touch-action: none;
 }
 
 .resize-handle:hover {
-  background: rgba(74, 158, 255, 0.3);
+  background: var(--color-primary);
+  opacity: 0.3;
 }
 
 .resize-handle:active {
-  background: rgba(74, 158, 255, 0.5);
+  background: var(--color-primary);
+  opacity: 0.5;
 }
 
 /* Prevent text selection during resize */
@@ -902,7 +908,7 @@ body.resizing * {
     width: 100%;
     height: 40vh;
     border-left: none;
-    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    border-top: 1px solid var(--color-border);
   }
 
   .flex-1.relative.overflow-hidden {

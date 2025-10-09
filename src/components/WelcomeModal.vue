@@ -2,10 +2,10 @@
   <div v-if="isOpen" class="modal-backdrop" @click.self="onBackdropClick">
     <div class="modal-content w-[600px] p-8">
       <div class="mb-6">
-        <h1 class="text-[28px] font-bold mb-3 text-white/95">
+        <h1 class="text-2xl font-semibold mb-3" style="color: var(--color-text-primary); letter-spacing: -0.02em;">
           Welcome to RiverChat 🌊
         </h1>
-        <p class="text-white/80 text-base leading-relaxed font-medium">
+        <p class="text-sm leading-relaxed font-medium" style="color: var(--color-text-secondary);">
           RiverChat is a non-linear chat application that visualizes conversations as branching rivers.
           To get started, please enter at least one API key.
         </p>
@@ -14,7 +14,7 @@
       <div class="flex flex-col gap-5 mb-6">
         <!-- OpenAI -->
         <div>
-          <label class="block mb-2.5 font-semibold text-white/90 text-[13.5px]">
+          <label class="block mb-2 font-medium text-xs" style="color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">
             OpenAI API Key
           </label>
           <input
@@ -23,14 +23,14 @@
             placeholder="sk-..."
             class="input-material"
           />
-          <p class="text-xs text-white/70 mt-2 font-medium">
+          <p class="text-xs mt-2 font-medium" style="color: var(--color-text-tertiary);">
             For GPT-4o, GPT-4 Turbo, etc.
           </p>
         </div>
 
         <!-- Anthropic -->
         <div>
-          <label class="block mb-2.5 font-semibold text-white/90 text-[13.5px]">
+          <label class="block mb-2 font-medium text-xs" style="color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">
             Anthropic API Key
           </label>
           <input
@@ -39,14 +39,14 @@
             placeholder="sk-ant-..."
             class="input-material"
           />
-          <p class="text-xs text-white/70 mt-2 font-medium">
+          <p class="text-xs mt-2 font-medium" style="color: var(--color-text-tertiary);">
             For Claude 3.5 Sonnet, Opus, etc.
           </p>
         </div>
 
         <!-- Google -->
         <div>
-          <label class="block mb-2.5 font-semibold text-white/90 text-[13.5px]">
+          <label class="block mb-2 font-medium text-xs" style="color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">
             Google Gemini API Key
           </label>
           <input
@@ -55,16 +55,16 @@
             placeholder="AIza..."
             class="input-material"
           />
-          <p class="text-xs text-white/70 mt-2 font-medium">
+          <p class="text-xs mt-2 font-medium" style="color: var(--color-text-tertiary);">
             For Gemini 2.0 Flash, Gemini 1.5 Pro, etc.
           </p>
         </div>
       </div>
 
       <!-- Security Notice -->
-      <div class="bg-info/15 border border-info/40 rounded-lg p-4 mb-6">
-        <p class="text-[13.5px] text-white/95 leading-relaxed">
-          🔒 <strong class="font-bold">Privacy Note:</strong> Your API keys are stored securely in your browser's local storage
+      <div class="rounded-lg p-4 mb-6" style="background: var(--color-info-bg); border: 1px solid var(--color-info);">
+        <p class="text-xs leading-relaxed" style="color: var(--color-text-primary);">
+          🔒 <strong class="font-semibold">Privacy Note:</strong> Your API keys are stored securely in your browser's local storage
           and are never sent to any server except the selected LLM provider.
         </p>
       </div>
@@ -74,13 +74,14 @@
         <button
           @click="handleSave"
           :disabled="!hasAtLeastOneKey"
-          class="btn-material px-6 py-3 text-base font-bold"
+          class="btn-material"
+          style="padding: 10px 24px; font-weight: 600; font-size: 14px; background: var(--color-primary-muted); color: var(--color-primary); border-color: var(--color-primary);"
         >
           Get Started
         </button>
       </div>
 
-      <p v-if="!hasAtLeastOneKey" class="text-warning text-[13px] text-right mt-2.5 font-semibold">
+      <p v-if="!hasAtLeastOneKey" class="text-xs text-right mt-2.5 font-semibold" style="color: var(--color-warning);">
         Please enter at least one API key to continue
       </p>
     </div>

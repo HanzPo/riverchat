@@ -274,13 +274,13 @@ const ctrlKey = computed(() => {
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(8px);
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 1000;
-  animation: fadeIn 0.15s ease-out;
+  animation: fadeIn 0.15s var(--ease-in-out);
 }
 
 @keyframes fadeIn {
@@ -293,17 +293,17 @@ const ctrlKey = computed(() => {
 }
 
 .modal-container {
-  background: rgba(20, 20, 20, 0.98);
+  background: var(--color-background-elevated);
   backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
   max-width: 1100px;
   width: 90%;
   max-height: 85vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.3);
-  animation: slideUp 0.2s ease-out;
+  box-shadow: var(--shadow-2xl);
+  animation: slideUp 0.2s var(--ease-out-expo);
 }
 
 @keyframes slideUp {
@@ -321,14 +321,15 @@ const ctrlKey = computed(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 24px 28px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .modal-title {
-  font-size: 24px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.95);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  letter-spacing: -0.01em;
   margin: 0;
   display: flex;
   align-items: center;
@@ -338,36 +339,36 @@ const ctrlKey = computed(() => {
 .modal-close-btn {
   background: transparent;
   border: none;
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 24px;
+  color: var(--color-text-secondary);
+  font-size: 20px;
   cursor: pointer;
   padding: 8px 12px;
-  border-radius: 8px;
-  transition: all 0.2s ease;
+  border-radius: 6px;
+  transition: all 0.15s var(--ease-in-out);
 }
 
 .modal-close-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.9);
+  background: var(--color-background-hover);
+  color: var(--color-text-primary);
 }
 
 .modal-body {
   flex: 1;
   overflow-y: auto;
-  padding: 28px;
+  padding: 20px 24px;
 }
 
 .shortcuts-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 28px;
+  gap: 20px;
 }
 
 .shortcuts-section {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  padding: 20px;
+  background: var(--color-background-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 16px;
 }
 
 .shortcuts-section-full {
@@ -375,18 +376,19 @@ const ctrlKey = computed(() => {
 }
 
 .section-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: rgba(74, 158, 255, 0.95);
-  margin: 0 0 16px 0;
-  padding-bottom: 10px;
-  border-bottom: 1px solid rgba(74, 158, 255, 0.2);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-primary);
+  margin: 0 0 12px 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--color-border);
+  letter-spacing: -0.01em;
 }
 
 .shortcuts-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .shortcut-item {
@@ -394,13 +396,13 @@ const ctrlKey = computed(() => {
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-  padding: 10px;
-  border-radius: 8px;
-  transition: background 0.2s ease;
+  padding: 8px;
+  border-radius: 6px;
+  transition: background 0.15s var(--ease-in-out);
 }
 
 .shortcut-item:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--color-background-hover);
 }
 
 .shortcut-keys {
@@ -411,28 +413,28 @@ const ctrlKey = computed(() => {
 }
 
 .shortcut-keys span {
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--color-text-disabled);
   font-size: 12px;
 }
 
 kbd {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 6px;
-  padding: 4px 10px;
-  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-  font-size: 13px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2), inset 0 -2px 0 rgba(0, 0, 0, 0.2);
-  min-width: 28px;
+  background: var(--color-background-tertiary);
+  border: 1px solid var(--color-border-light);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  min-width: 24px;
   text-align: center;
   display: inline-block;
 }
 
 .shortcut-description {
-  color: rgba(255, 255, 255, 0.75);
-  font-size: 14px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
   flex: 1;
   text-align: right;
 }
@@ -440,26 +442,26 @@ kbd {
 .tips-list {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 
 .tip-item {
-  color: rgba(255, 255, 255, 0.75);
-  font-size: 14px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
   line-height: 1.6;
   padding: 12px;
-  background: rgba(74, 158, 255, 0.08);
-  border-left: 3px solid rgba(74, 158, 255, 0.5);
+  background: var(--color-primary-muted);
+  border-left: 3px solid var(--color-primary);
   border-radius: 6px;
 }
 
 .tip-item strong {
-  color: rgba(255, 255, 255, 0.95);
+  color: var(--color-text-primary);
   font-weight: 600;
 }
 
 .tip-item kbd {
-  font-size: 12px;
+  font-size: 11px;
   padding: 2px 6px;
   margin: 0 2px;
 }

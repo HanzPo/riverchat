@@ -2,10 +2,10 @@
   <div v-if="isOpen" class="modal-backdrop" @click.self="emit('close')">
     <div class="modal-content w-[700px] max-h-[80vh] p-8 flex flex-col">
       <div class="mb-6">
-        <h2 class="text-2xl font-bold mb-2 text-white/95">
+        <h2 class="text-xl font-semibold mb-2" style="color: var(--color-text-primary); letter-spacing: -0.01em;">
           Your Rivers
         </h2>
-        <p class="text-white/75 text-sm font-medium">
+        <p class="text-sm font-medium" style="color: var(--color-text-secondary);">
           Manage your conversation sessions
         </p>
       </div>
@@ -32,9 +32,9 @@
 
       <!-- Rivers List -->
       <div class="flex-1 overflow-y-auto min-h-[200px] overflow-x-visible">
-        <div v-if="rivers.length === 0" class="text-center py-15 px-5 text-white/70">
-          <p class="text-base mb-2 font-medium">No rivers yet</p>
-          <p class="text-sm font-medium">Create your first conversation river above</p>
+        <div v-if="rivers.length === 0" class="text-center py-15 px-5" style="color: var(--color-text-secondary);">
+          <p class="text-sm mb-2 font-medium">No rivers yet</p>
+          <p class="text-xs font-medium" style="color: var(--color-text-tertiary);">Create your first conversation river above</p>
         </div>
 
         <div v-else class="flex flex-col gap-3">
@@ -46,17 +46,18 @@
           >
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 mb-1.5">
-                <h3 class="text-base font-semibold text-white/95 overflow-hidden text-ellipsis whitespace-nowrap">
+                <h3 class="text-sm font-semibold overflow-hidden text-ellipsis whitespace-nowrap" style="color: var(--color-text-primary); letter-spacing: -0.01em;">
                   {{ river.name }}
                 </h3>
                 <span
                   v-if="river.id === activeRiverId"
-                  class="px-2 py-0.5 bg-success/25 text-success rounded-md text-[10.5px] font-bold uppercase tracking-wider border border-success/40"
+                  class="px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide"
+                  style="background: var(--color-success-bg); color: var(--color-success); border: 1px solid var(--color-success);"
                 >
                   Active
                 </span>
               </div>
-              <div class="flex gap-4 text-xs text-white/70 font-medium">
+              <div class="flex gap-4 text-xs font-medium" style="color: var(--color-text-tertiary);">
                 <span>{{ formatDate(river.lastModified) }}</span>
                 <span>{{ getNodeCount(river) }} nodes</span>
               </div>
@@ -65,14 +66,16 @@
             <div class="flex gap-2" @click.stop>
               <button
                 @click="handleRenameRiver(river)"
-                class="btn-material px-3 py-1.5 text-[13px]"
+                class="btn-material"
+                style="padding: 6px 10px; font-size: 12px;"
                 title="Rename"
               >
                 ✏️
               </button>
               <button
                 @click="handleDeleteRiver(river)"
-                class="btn-material px-3 py-1.5 text-[13px]"
+                class="btn-material"
+                style="padding: 6px 10px; font-size: 12px;"
                 title="Delete"
               >
                 🗑️
@@ -83,8 +86,8 @@
       </div>
 
       <!-- Close Button -->
-      <div class="flex justify-end mt-5 pt-5 border-t border-white/15">
-        <button @click="emit('close')" class="btn-material px-6 py-2.5">
+      <div class="flex justify-end mt-5 pt-5" style="border-top: 1px solid var(--color-border);">
+        <button @click="emit('close')" class="btn-material" style="padding: 8px 16px;">
           Close
         </button>
       </div>

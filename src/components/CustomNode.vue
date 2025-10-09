@@ -4,7 +4,7 @@
     :class="{
       'animate-pulse opacity-70': data.state === 'generating',
       'border-error border-2': data.state === 'error',
-      'shadow-[0_0_0_3px] shadow-primary/40 border-2 border-primary': selected,
+      'selected-node': selected,
       'bg-primary/20 border-primary/30': data.type === 'user',
       'bg-secondary/20 border-secondary/30': data.type === 'ai',
     }"
@@ -15,37 +15,39 @@
     <!-- Header -->
     <div class="flex justify-between items-center mb-3 gap-2">
       <span 
-        class="text-[10.5px] font-bold px-2.5 py-1 rounded-md uppercase tracking-wider border"
-        :class="data.type === 'user' ? 'bg-primary/30 border-primary/50 text-primary' : 'bg-secondary/30 border-secondary/50 text-secondary'"
+        class="text-[10px] font-semibold px-2.5 py-1 rounded uppercase tracking-wide"
+        :style="data.type === 'user' 
+          ? 'background: var(--color-primary-muted); color: var(--color-primary); border: 1px solid var(--color-primary);' 
+          : 'background: rgba(162, 89, 255, 0.1); color: var(--color-accent); border: 1px solid var(--color-accent);'"
       >
         {{ data.type === 'user' ? '👤 USER' : '🤖 AI' }}
       </span>
-      <span v-if="data.model" class="text-[11px] font-medium text-white/75 overflow-hidden text-ellipsis whitespace-nowrap">
+      <span v-if="data.model" class="text-xs font-medium overflow-hidden text-ellipsis whitespace-nowrap" style="color: var(--color-text-secondary);">
         {{ data.model.displayName }}
       </span>
     </div>
 
     <!-- Branch Metadata Badge -->
-    <div v-if="data.branchMetadata" class="mb-2.5 p-2 bg-accent/10 border border-accent/30 rounded-md">
-      <div class="text-[8px] font-bold text-white/60 uppercase tracking-wider mb-1">Selected Text</div>
-      <div class="text-[9px] text-white/70 italic line-clamp-2">
+    <div v-if="data.branchMetadata" class="mb-2.5 p-2 rounded-md" style="background: rgba(162, 89, 255, 0.1); border: 1px solid rgba(162, 89, 255, 0.3);">
+      <div class="text-[8px] font-semibold uppercase tracking-wider mb-1" style="color: var(--color-text-tertiary);">Selected Text</div>
+      <div class="text-[9px] italic line-clamp-2" style="color: var(--color-text-secondary);">
         "{{ data.branchMetadata.highlightedText }}"
       </div>
     </div>
 
     <!-- Content Preview -->
-    <div class="text-white/95 text-[13.5px] leading-relaxed mb-3 break-words whitespace-pre-wrap font-normal">
+    <div class="text-sm leading-relaxed mb-3 break-words whitespace-pre-wrap font-normal" style="color: var(--color-text-primary);">
       {{ truncateContent(data.content) }}
-      <span v-if="data.state === 'generating'" class="inline-block animate-blink text-info font-bold">▊</span>
+      <span v-if="data.state === 'generating'" class="inline-block animate-blink font-bold" style="color: var(--color-primary);">▊</span>
     </div>
 
     <!-- Error Badge -->
-    <div v-if="data.state === 'error'" class="bg-error/25 text-error px-2.5 py-1.5 rounded-md text-xs font-semibold mb-2 text-center border border-error/40">
+    <div v-if="data.state === 'error'" class="px-2.5 py-1.5 rounded text-xs font-semibold mb-2 text-center" style="background: var(--color-error-bg); color: var(--color-error); border: 1px solid var(--color-error);">
       ⚠️ Error
     </div>
 
     <!-- Timestamp -->
-    <div class="text-[11px] text-white/70 text-right font-medium">
+    <div class="text-xs text-right font-medium" style="color: var(--color-text-tertiary);">
       {{ formatTime(data.timestamp) }}
     </div>
   </div>
@@ -93,6 +95,11 @@ function handleContextMenu(event: MouseEvent) {
 </script>
 
 <style scoped>
+/* Override card-material to use consistent 2px border to prevent text reflow */
+.card-material {
+  border-width: 2px !important;
+}
+
 @keyframes blink {
   0%, 50% {
     opacity: 1;
@@ -118,5 +125,13 @@ function handleContextMenu(event: MouseEvent) {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* Selected node styling - prominent outline with consistent border width */
+.selected-node {
+  border-color: var(--color-primary) !important;
+  box-shadow: 0 0 0 4px var(--color-primary-muted),
+              0 4px 12px rgba(13, 153, 255, 0.3) !important;
+  outline: none;
 }
 </style>

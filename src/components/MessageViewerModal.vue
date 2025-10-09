@@ -6,46 +6,49 @@
         <div>
           <div class="flex items-center gap-2.5 mb-2.5">
             <span
-              class="px-2.5 py-1 rounded-md text-[10.5px] font-bold uppercase tracking-wider border"
-              :class="message.type === 'user' ? 'bg-primary/30 border-primary/50 text-primary' : 'bg-secondary/30 border-secondary/50 text-secondary'"
+              class="px-2.5 py-1 rounded text-[10px] font-semibold uppercase tracking-wide"
+              :style="message.type === 'user' 
+                ? 'background: var(--color-primary-muted); color: var(--color-primary); border: 1px solid var(--color-primary);' 
+                : 'background: var(--color-accent); opacity: 0.2; color: var(--color-accent); border: 1px solid var(--color-accent);'"
             >
               {{ message.type === 'user' ? 'USER' : 'AI' }}
             </span>
-            <span v-if="message.model" class="text-white/75 text-[13px] font-medium">
+            <span v-if="message.model" class="text-xs font-medium" style="color: var(--color-text-secondary);">
               {{ message.model.displayName }}
             </span>
           </div>
-          <p class="text-white/70 text-[13px] font-medium">
+          <p class="text-xs font-medium" style="color: var(--color-text-tertiary);">
             {{ formatTimestamp(message.timestamp) }}
           </p>
         </div>
 
-        <button @click="handleCopy" class="btn-material flex items-center gap-1.5 px-4 py-2">
-          <span class="font-semibold">{{ copied ? 'Copied!' : 'Copy' }}</span>
+        <button @click="handleCopy" class="btn-material flex items-center gap-1.5" style="padding: 8px 14px;">
+          <span class="font-medium text-xs">{{ copied ? 'Copied!' : 'Copy' }}</span>
         </button>
       </div>
 
       <!-- Message Content -->
-      <div class="card-material p-6 text-white/95 break-words leading-relaxed text-[15px] font-sans markdown-content">
+      <div class="card-material p-6 break-words leading-relaxed text-sm markdown-content" style="color: var(--color-text-primary);">
         <div v-html="renderMarkdown(message.content)"></div>
       </div>
 
       <!-- Error State -->
       <div
         v-if="message.state === 'error' && message.error"
-        class="mt-4 bg-error/20 border border-error/40 rounded-lg p-4"
+        class="mt-4 rounded-lg p-4"
+        style="background: var(--color-error-bg); border: 1px solid var(--color-error);"
       >
-        <p class="text-error text-[13.5px] font-bold mb-1.5">
+        <p class="text-xs font-semibold mb-1.5" style="color: var(--color-error);">
           Error:
         </p>
-        <p class="text-error text-[13.5px] font-medium">
+        <p class="text-xs font-medium" style="color: var(--color-error);">
           {{ message.error }}
         </p>
       </div>
 
       <!-- Close Button -->
       <div class="flex justify-end mt-6">
-        <button @click="emit('close')" class="btn-material px-6 py-2.5">
+        <button @click="emit('close')" class="btn-material" style="padding: 8px 16px;">
           Close
         </button>
       </div>
@@ -129,20 +132,21 @@ function handleCopy() {
 .markdown-content :deep(h4) { font-size: 1.05em; }
 
 .markdown-content :deep(code) {
-  background-color: rgba(255, 255, 255, 0.1);
+  background: var(--color-background-tertiary);
   padding: 0.15em 0.4em;
-  border-radius: 3px;
+  border-radius: 4px;
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
   font-size: 0.9em;
+  border: 1px solid var(--color-border);
 }
 
 .markdown-content :deep(pre) {
-  background-color: rgba(0, 0, 0, 0.3);
+  background: var(--color-background);
   padding: 0.75em;
   border-radius: 6px;
   overflow-x: auto;
   margin: 0.75em 0;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--color-border);
 }
 
 .markdown-content :deep(pre code) {
@@ -164,25 +168,25 @@ function handleCopy() {
 }
 
 .markdown-content :deep(blockquote) {
-  border-left: 3px solid rgba(255, 255, 255, 0.3);
+  border-left: 3px solid var(--color-border-light);
   padding-left: 1em;
   margin: 0.75em 0;
   font-style: italic;
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--color-text-secondary);
 }
 
 .markdown-content :deep(a) {
-  color: #6eb4f7;
+  color: var(--color-primary);
   text-decoration: underline;
 }
 
 .markdown-content :deep(a:hover) {
-  color: #8cc5ff;
+  color: var(--color-primary-hover);
 }
 
 .markdown-content :deep(hr) {
   border: none;
-  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  border-top: 1px solid var(--color-border);
   margin: 1em 0;
 }
 
@@ -194,13 +198,13 @@ function handleCopy() {
 
 .markdown-content :deep(th),
 .markdown-content :deep(td) {
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid var(--color-border);
   padding: 0.5em;
   text-align: left;
 }
 
 .markdown-content :deep(th) {
-  background-color: rgba(255, 255, 255, 0.1);
+  background: var(--color-background-tertiary);
   font-weight: bold;
 }
 

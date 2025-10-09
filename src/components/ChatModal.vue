@@ -321,24 +321,35 @@ const canSend = computed(() => {
 watch(
   () => props.path,
   async () => {
+    // Use requestAnimationFrame for more reliable scroll timing after DOM updates
     await nextTick();
-    if (messagesContainer.value) {
-      messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
-    }
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (messagesContainer.value) {
+          messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
+        }
+      });
+    });
   },
-  { immediate: true, deep: true }
+  { immediate: true, deep: true, flush: 'post' }
 );
 
-// Autofocus textarea when modal opens
+// Autofocus textarea and scroll to bottom when modal opens
 watch(
   () => props.isOpen,
   async (isOpen) => {
     if (isOpen) {
       await nextTick();
-      await nextTick();
-      setTimeout(() => {
-        textareaRef.value?.focus();
-      }, 100);
+      // Scroll to bottom when modal opens
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (messagesContainer.value) {
+            messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
+          }
+          // Focus textarea after scrolling
+          textareaRef.value?.focus();
+        });
+      });
     }
   },
   { immediate: true }
@@ -347,9 +358,21 @@ watch(
 function handleKeydown(event: KeyboardEvent) {
   // Handle Enter key
   if (event.key === 'Enter') {
-    // Ctrl+Enter or Cmd+Enter: insert newline (default behavior)
+    // Ctrl+Enter or Cmd+Enter: insert newline
     if (event.ctrlKey || event.metaKey) {
-      // Allow default textarea behavior to insert newline
+      event.preventDefault();
+      // Manually insert newline at cursor position
+      const textarea = textareaRef.value;
+      if (textarea) {
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const value = inputText.value;
+        inputText.value = value.substring(0, start) + '\n' + value.substring(end);
+        // Restore cursor position after the newline
+        nextTick(() => {
+          textarea.selectionStart = textarea.selectionEnd = start + 1;
+        });
+      }
       return;
     }
     
