@@ -57,18 +57,20 @@
             <!-- Header -->
             <div class="flex justify-between items-center mb-3 gap-2">
               <div class="flex items-center gap-2">
-                <span 
-                  class="text-xs font-bold px-3 py-1.5 rounded-md uppercase tracking-wider border"
+                <span
+                  class="text-xs font-bold px-3 py-1.5 rounded-md uppercase tracking-wider border flex items-center gap-1.5"
                   :class="message.type === 'user' ? 'bg-primary/30 border-primary/50 text-primary' : 'bg-secondary/30 border-secondary/50 text-secondary'"
                 >
-                  {{ message.type === 'user' ? '👤 YOU' : '🤖 AI' }}
+                  <User v-if="message.type === 'user'" :size="13" />
+                  <Bot v-else :size="13" />
+                  <span>{{ message.type === 'user' ? 'YOU' : 'AI' }}</span>
                 </span>
                 <span
                   v-if="getBranchCount(message.id) > 0"
                   class="text-xs font-bold px-2.5 py-1 rounded-md bg-accent/30 border border-accent/50 text-accent flex items-center gap-1"
                   :title="`${getBranchCount(message.id)} branch${getBranchCount(message.id) > 1 ? 'es' : ''} from highlighted text`"
                 >
-                  <span>🌿</span>
+                  <GitBranch :size="12" />
                   <span>{{ getBranchCount(message.id) }}</span>
                 </span>
               </div>
@@ -99,8 +101,9 @@
               <span class="font-medium">
                 {{ formatTime(message.timestamp) }}
               </span>
-              <span v-if="message.state === 'error'" class="text-error font-bold">
-                ⚠️ Error
+              <span v-if="message.state === 'error'" class="text-error font-bold flex items-center gap-1">
+                <AlertTriangle :size="13" />
+                <span>Error</span>
               </span>
             </div>
           </div>
@@ -112,7 +115,9 @@
         <!-- Hint when user node is selected -->
         <div v-if="!canSend && !isNewRootMode && path.length > 0" class="flex items-center justify-center py-10 px-6">
           <div class="text-center">
-            <div class="text-4xl mb-4">💬</div>
+            <div class="flex justify-center mb-4">
+              <MessageCircle :size="48" :stroke-width="1.5" style="color: var(--color-text-tertiary);" />
+            </div>
             <p class="text-white/90 text-lg font-bold mb-3">
               Select an AI response to reply
             </p>
@@ -128,15 +133,15 @@
           <div v-if="branchContext.text" class="mb-4 p-3.5 bg-accent/10 border border-accent/30 rounded-lg animate-slide-in">
             <div class="flex items-start justify-between gap-2 mb-2">
               <div class="flex items-center gap-2">
-                <span class="text-accent text-base">🌿</span>
+                <GitBranch :size="16" class="text-accent" />
                 <span class="text-xs font-bold text-accent uppercase tracking-wider">Selected Context</span>
               </div>
               <button
                 @click="clearBranchContext"
-                class="text-white/50 hover:text-white/90 transition-colors text-sm font-bold px-2.5 py-1 hover:bg-white/10 rounded"
+                class="text-white/50 hover:text-white/90 transition-colors text-sm font-bold px-2.5 py-1 hover:bg-white/10 rounded flex items-center"
                 title="Clear context"
               >
-                ✕
+                <X :size="16" />
               </button>
             </div>
             <div class="text-sm text-white/75 italic pl-3 border-l-2 border-accent/50 max-h-32 overflow-y-auto">
@@ -201,6 +206,7 @@ import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import type { MessageNode, LLMModel } from '../types';
 import { AVAILABLE_MODELS } from '../types';
+import { User, Bot, GitBranch, AlertTriangle, MessageCircle, X } from 'lucide-vue-next';
 import TextHighlightPopover from './TextHighlightPopover.vue';
 
 interface Props {

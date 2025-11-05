@@ -56,7 +56,8 @@
       <!-- Pane Context Menu (when no node is selected) -->
       <template v-if="!contextMenu.node && contextMenu.selectedNodes.length === 0">
         <div class="context-menu-item" @click="handleCreateRootNode">
-          ➕ New Root Node
+          <Plus :size="16" />
+          <span>New Root Node</span>
         </div>
       </template>
 
@@ -65,9 +66,10 @@
         <div class="context-menu-item context-menu-item-header">
           {{ contextMenu.selectedNodes.length }} Nodes Selected
         </div>
-        
+
         <div class="context-menu-item context-menu-item-danger" @click="handleDeleteMultipleNodes">
-          🗑️ Delete Selected Nodes
+          <Trash2 :size="16" />
+          <span>Delete Selected Nodes</span>
         </div>
       </template>
 
@@ -78,11 +80,13 @@
           class="context-menu-item"
           @click="handleEditAndResubmit"
         >
-          ✏️ Edit & Resubmit
+          <Pencil :size="16" />
+          <span>Edit & Resubmit</span>
         </div>
-        
+
         <div class="context-menu-item" @click="handleBranchFromHere">
-          🌿 Branch From Here
+          <GitBranch :size="16" />
+          <span>Branch From Here</span>
         </div>
 
         <div
@@ -90,19 +94,23 @@
           class="context-menu-item"
           @click="handleRegenerateResponse"
         >
-          🔄 Regenerate Response
+          <RotateCw :size="16" />
+          <span>Regenerate Response</span>
         </div>
 
         <div class="context-menu-item" @click="handleCopyMessage">
-          📋 Copy Message
+          <Copy :size="16" />
+          <span>Copy Message</span>
         </div>
 
         <div class="context-menu-item" @click="handleViewFull">
-          👁️ View Full Message
+          <Eye :size="16" />
+          <span>View Full Message</span>
         </div>
 
         <div class="context-menu-item context-menu-item-danger" @click="handleDeleteBranch">
-          🗑️ Delete Branch
+          <Trash2 :size="16" />
+          <span>Delete Branch</span>
         </div>
       </template>
     </div>
@@ -116,6 +124,7 @@ import { Background } from '@vue-flow/background';
 import { Controls } from '@vue-flow/controls';
 import { MiniMap } from '@vue-flow/minimap';
 import type { MessageNode, VueFlowNode, VueFlowEdge } from '../types';
+import { Plus, Trash2, Pencil, GitBranch, RotateCw, Copy, Eye } from 'lucide-vue-next';
 import CustomNode from './CustomNode.vue';
 
 // Import Vue Flow styles

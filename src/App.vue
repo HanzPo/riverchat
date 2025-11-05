@@ -12,17 +12,18 @@
       </div>
 
       <div class="flex gap-3">
-        <button @click="showRiverDashboard = true" class="btn-material" title="Manage Rivers (Ctrl+K)">
-          📂 Rivers
+        <button @click="showRiverDashboard = true" class="btn-material flex items-center gap-2" title="Manage Rivers (Ctrl+K)">
+          <Folder :size="16" />
+          <span>Rivers</span>
         </button>
         <button @click="handleSearch" class="btn-material" title="Search (Ctrl+F)">
-          🔍
+          <Search :size="16" />
         </button>
         <button @click="showHelp = true" class="btn-material" title="Keyboard Shortcuts (Ctrl+?)">
-          ❓
+          <HelpCircle :size="16" />
         </button>
         <button @click="showSettings = true" class="btn-material" title="Settings (Ctrl+,)">
-          ⚙️
+          <Settings :size="16" />
         </button>
       </div>
     </div>
@@ -53,12 +54,12 @@
         />
         
         <!-- New Root Node Button (Floating) -->
-        <button 
+        <button
           v-if="currentRiver && !selectedNodeId && !isNewRootMode && !hasMultipleNodesSelected"
-          @click="handleCreateRootNode" 
+          @click="handleCreateRootNode"
           class="absolute top-4 right-4 btn-material px-6 py-3 text-sm font-bold flex items-center gap-2 z-10 shadow-elevation-3"
         >
-          <span class="text-lg">➕</span>
+          <Plus :size="18" />
           <span>New Root Node</span>
         </button>
         
@@ -204,6 +205,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRiverChat } from './composables/useRiverChat';
 import type { MessageNode, LLMModel } from './types';
+import { Folder, Search, HelpCircle, Settings, Plus } from 'lucide-vue-next';
 
 import GraphCanvas from './components/GraphCanvas.vue';
 import ChatHistory from './components/ChatHistory.vue';

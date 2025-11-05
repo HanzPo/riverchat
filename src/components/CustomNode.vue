@@ -14,13 +14,15 @@
   >
     <!-- Header -->
     <div class="flex justify-between items-center mb-3 gap-2">
-      <span 
-        class="text-[10px] font-semibold px-2.5 py-1 rounded uppercase tracking-wide"
-        :style="data.type === 'user' 
-          ? 'background: var(--color-primary-muted); color: var(--color-primary); border: 1px solid var(--color-primary);' 
+      <span
+        class="text-[10px] font-semibold px-2.5 py-1 rounded uppercase tracking-wide flex items-center gap-1.5"
+        :style="data.type === 'user'
+          ? 'background: var(--color-primary-muted); color: var(--color-primary); border: 1px solid var(--color-primary);'
           : 'background: rgba(162, 89, 255, 0.1); color: var(--color-accent); border: 1px solid var(--color-accent);'"
       >
-        {{ data.type === 'user' ? '👤 USER' : '🤖 AI' }}
+        <User v-if="data.type === 'user'" :size="11" />
+        <Bot v-else :size="11" />
+        <span>{{ data.type === 'user' ? 'USER' : 'AI' }}</span>
       </span>
       <span v-if="data.model" class="text-xs font-medium overflow-hidden text-ellipsis whitespace-nowrap" style="color: var(--color-text-secondary);">
         {{ data.model.displayName }}
@@ -42,8 +44,9 @@
     </div>
 
     <!-- Error Badge -->
-    <div v-if="data.state === 'error'" class="px-2.5 py-1.5 rounded text-xs font-semibold mb-2 text-center" style="background: var(--color-error-bg); color: var(--color-error); border: 1px solid var(--color-error);">
-      ⚠️ Error
+    <div v-if="data.state === 'error'" class="px-2.5 py-1.5 rounded text-xs font-semibold mb-2 text-center flex items-center justify-center gap-1.5" style="background: var(--color-error-bg); color: var(--color-error); border: 1px solid var(--color-error);">
+      <AlertTriangle :size="12" />
+      <span>Error</span>
     </div>
 
     <!-- Timestamp -->
@@ -55,6 +58,7 @@
 
 <script setup lang="ts">
 import type { MessageNode } from '../types';
+import { User, Bot, AlertTriangle } from 'lucide-vue-next';
 
 interface Props {
   data: MessageNode;
