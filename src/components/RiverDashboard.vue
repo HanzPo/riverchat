@@ -70,7 +70,7 @@
                 style="padding: 6px 10px; font-size: 12px;"
                 title="Rename"
               >
-                ✏️
+                <Pencil :size="14" />
               </button>
               <button
                 @click="handleDeleteRiver(river)"
@@ -78,7 +78,7 @@
                 style="padding: 6px 10px; font-size: 12px;"
                 title="Delete"
               >
-                🗑️
+                <Trash2 :size="14" />
               </button>
             </div>
           </div>
@@ -110,6 +110,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import type { River } from '../types';
+import { Pencil, Trash2 } from 'lucide-vue-next';
 import ConfirmationModal from './ConfirmationModal.vue';
 
 interface Props {

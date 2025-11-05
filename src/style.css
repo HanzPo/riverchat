@@ -88,7 +88,7 @@
   font-weight: 500;
   letter-spacing: -0.01em;
   padding: 6px 12px;
-  border-radius: 6px;
+  border-radius: 4px;
   cursor: pointer;
   transition: all 0.15s var(--ease-in-out);
 }
@@ -113,7 +113,7 @@
 .card-material {
   background: var(--color-background-secondary);
   border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: 5px;
   box-shadow: var(--shadow-sm);
   transition: all 0.15s var(--ease-in-out);
 }
@@ -132,7 +132,7 @@
 .input-material {
   background: var(--color-background-secondary);
   border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border-radius: 4px;
   color: var(--color-text-primary);
   font-size: 13px;
   font-weight: 400;
@@ -160,7 +160,7 @@
 .textarea-material {
   background: var(--color-background-secondary);
   border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border-radius: 4px;
   color: var(--color-text-primary);
   font-size: 13px;
   font-weight: 400;
@@ -190,7 +190,7 @@
 .select-material {
   background: var(--color-background-secondary);
   border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border-radius: 4px;
   color: var(--color-text-primary);
   font-size: 13px;
   font-weight: 500;
@@ -225,7 +225,7 @@
 .modal-content {
   background: var(--color-background-elevated);
   border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: 6px;
   box-shadow: var(--shadow-2xl);
   max-width: 90vw;
   max-height: 90vh;
@@ -238,7 +238,7 @@
   position: fixed;
   background: var(--color-background-elevated);
   border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: 5px;
   box-shadow: var(--shadow-xl);
   padding: 4px;
   z-index: 2000;
@@ -288,7 +288,7 @@
   top: 80px;
   left: 24px;
   padding: 12px 16px;
-  border-radius: 8px;
+  border-radius: 5px;
   z-index: 9999;
   box-shadow: var(--shadow-xl);
   font-size: 13px;
@@ -336,7 +336,7 @@
 
 ::-webkit-scrollbar-thumb {
   background: var(--color-border);
-  border-radius: 6px;
+  border-radius: 4px;
   border: 3px solid var(--color-background);
   transition: background-color 0.2s ease;
 }
