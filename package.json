@@ -14,7 +14,6 @@
     "@vue-flow/core": "^1.47.0",
     "@vue-flow/minimap": "^1.5.4",
     "dompurify": "^3.2.7",
-    "firebase": "^12.5.0",
     "lucide-vue-next": "^0.552.0",
     "marked": "^16.3.0",
     "uuid": "^13.0.0",
