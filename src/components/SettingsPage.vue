@@ -89,11 +89,12 @@
           </button>
           <button
             @click="handleSaveApiKey"
-            :disabled="!hasApiKeyChanges"
-            class="btn-material px-6 py-2.5 font-semibold"
-            :style="!hasApiKeyChanges ? 'opacity: 0.5; cursor: not-allowed;' : 'background: var(--color-primary-muted); color: var(--color-primary); border-color: var(--color-primary);'"
+            :disabled="!hasApiKeyChanges || isSaving"
+            class="btn-material px-6 py-2.5 font-semibold flex items-center gap-3"
+            :style="(!hasApiKeyChanges || isSaving) ? 'opacity: 0.5; cursor: not-allowed;' : 'background: var(--color-primary-muted); color: var(--color-primary); border-color: var(--color-primary);'"
           >
-            Save Changes
+            <div v-if="isSaving" class="loading-spinner-small"></div>
+            <span>{{ isSaving ? 'Saving...' : 'Save Changes' }}</span>
           </button>
         </div>
       </div>
@@ -296,11 +297,12 @@
           </button>
           <button
             @click="handleSaveModels"
-            :disabled="!hasModelChanges"
-            class="btn-material px-6 py-2.5 font-semibold"
-            :style="!hasModelChanges ? 'opacity: 0.5; cursor: not-allowed;' : 'background: var(--color-primary-muted); color: var(--color-primary); border-color: var(--color-primary);'"
+            :disabled="!hasModelChanges || isSaving"
+            class="btn-material px-6 py-2.5 font-semibold flex items-center gap-3"
+            :style="(!hasModelChanges || isSaving) ? 'opacity: 0.5; cursor: not-allowed;' : 'background: var(--color-primary-muted); color: var(--color-primary); border-color: var(--color-primary);'"
           >
-            Save Changes
+            <div v-if="isSaving" class="loading-spinner-small"></div>
+            <span>{{ isSaving ? 'Saving...' : 'Save Changes' }}</span>
           </button>
         </div>
       </div>
@@ -600,6 +602,7 @@ const modelDetailsModal = ref<{
 
 // Data tab state
 const isRefreshingModels = ref(false);
+const isSaving = ref(false);
 
 // Compute ranges from available models
 // Not needed anymore - using fixed ranges
@@ -789,40 +792,45 @@ function handleUndoApiKey() {
   handleApiKeyChange();
 }
 
-function handleSaveApiKey() {
-  // Check if API key changed before updating
-  const apiKeyChanged = localApiKey.value !== originalApiKey.value;
-  
-  // Filter models based on new API key
-  handleApiKeyChange();
+async function handleSaveApiKey() {
+  isSaving.value = true;
+  try {
+    // Check if API key changed before updating
+    const apiKeyChanged = localApiKey.value !== originalApiKey.value;
+    
+    // Filter models based on new API key
+    handleApiKeyChange();
 
-  originalApiKey.value = localApiKey.value;
-  originalEnabledModels.value = { ...localEnabledModels.value };
-  
-  // Validate and clean up lastChatSelectedModels based on available models
-  let cleanedSelectedModels: LLMModel[] = [];
-  if (props.settings.lastChatSelectedModels && props.settings.lastChatSelectedModels.length > 0) {
-    cleanedSelectedModels = validateSelectedModels(
-      props.settings.lastChatSelectedModels,
-      availableModels.value,
-      localEnabledModels.value
-    );
-  }
-  
-  const updatedSettings: Settings = {
-    ...props.settings,
-    apiKeys: {
-      openrouter: localApiKey.value,
-    },
-    availableModels: [...availableModels.value],
-    enabledModels: { ...localEnabledModels.value },
-    lastChatSelectedModels: cleanedSelectedModels,
-  };
-  emit('save', updatedSettings);
-  
-  // Inform user to refresh models if they changed the API key
-  if (apiKeyChanged) {
-    alert('API key saved! Please go to Settings > Data to refresh your model list.');
+    originalApiKey.value = localApiKey.value;
+    originalEnabledModels.value = { ...localEnabledModels.value };
+    
+    // Validate and clean up lastChatSelectedModels based on available models
+    let cleanedSelectedModels: LLMModel[] = [];
+    if (props.settings.lastChatSelectedModels && props.settings.lastChatSelectedModels.length > 0) {
+      cleanedSelectedModels = validateSelectedModels(
+        props.settings.lastChatSelectedModels,
+        availableModels.value,
+        localEnabledModels.value
+      );
+    }
+    
+    const updatedSettings: Settings = {
+      ...props.settings,
+      apiKeys: {
+        openrouter: localApiKey.value,
+      },
+      availableModels: [...availableModels.value],
+      enabledModels: { ...localEnabledModels.value },
+      lastChatSelectedModels: cleanedSelectedModels,
+    };
+    emit('save', updatedSettings);
+    
+    // Inform user to refresh models if they changed the API key
+    if (apiKeyChanged) {
+      alert('API key saved! Please go to Settings > Data to refresh your model list.');
+    }
+  } finally {
+    isSaving.value = false;
   }
 }
 
@@ -830,26 +838,31 @@ function handleUndoModels() {
   localEnabledModels.value = { ...originalEnabledModels.value };
 }
 
-function handleSaveModels() {
-  originalEnabledModels.value = { ...localEnabledModels.value };
-  
-  // Validate and clean up lastChatSelectedModels based on new enabled models
-  let cleanedSelectedModels: LLMModel[] = [];
-  if (props.settings.lastChatSelectedModels && props.settings.lastChatSelectedModels.length > 0) {
-    cleanedSelectedModels = validateSelectedModels(
-      props.settings.lastChatSelectedModels,
-      props.settings.availableModels || [],
-      localEnabledModels.value
-    );
-  }
-  
-  const updatedSettings: Settings = {
-    ...props.settings,
-    enabledModels: localEnabledModels.value,
-    // Use cleaned selection or empty array to trigger auto-selection
+async function handleSaveModels() {
+  isSaving.value = true;
+  try {
+    originalEnabledModels.value = { ...localEnabledModels.value };
+    
+    // Validate and clean up lastChatSelectedModels based on new enabled models
+    let cleanedSelectedModels: LLMModel[] = [];
+    if (props.settings.lastChatSelectedModels && props.settings.lastChatSelectedModels.length > 0) {
+      cleanedSelectedModels = validateSelectedModels(
+        props.settings.lastChatSelectedModels,
+        props.settings.availableModels || [],
+        localEnabledModels.value
+      );
+    }
+    
+    const updatedSettings: Settings = {
+      ...props.settings,
+      enabledModels: localEnabledModels.value,
+      // Use cleaned selection or empty array to trigger auto-selection
     lastChatSelectedModels: cleanedSelectedModels,
   };
   emit('save', updatedSettings);
+  } finally {
+    isSaving.value = false;
+  }
 }
 
 function formatLastRefresh(): string {
@@ -964,6 +977,16 @@ function handleBack() {
 </script>
 
 <style scoped>
+/* Loading Spinner */
+.loading-spinner-small {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
 .line-clamp-2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;

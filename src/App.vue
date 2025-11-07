@@ -119,6 +119,7 @@
           :all-nodes="currentRiver?.nodes || {}"
           :api-keys="settings.apiKeys"
           :settings="settings"
+          :is-sending="isSendingMessage"
           @send="handleSendMessage"
           @node-select="selectNode"
           @branch-from-text="handleBranchFromText"
@@ -151,6 +152,7 @@
       :is-open="showRiverDashboard"
       :rivers="allRivers || []"
       :active-river-id="currentRiver?.id || null"
+      :is-loading="isRiverOperationLoading"
       @create="handleCreateRiver"
       @open="handleOpenRiver"
       @rename="handleRenameRiver"
@@ -211,6 +213,7 @@
       :all-nodes="currentRiver?.nodes || {}"
       :api-keys="settings.apiKeys"
       :settings="settings"
+      :is-sending="isSendingMessage"
       @send="handleSendMessage"
       @node-select="selectNode"
       @branch-from-text="handleBranchFromText"
@@ -228,6 +231,13 @@
     <!-- Toast Notification -->
     <div v-if="toast.visible && !showSettings" class="toast" :class="`toast-${toast.type}`">
       {{ toast.message }}
+    </div>
+
+    <!-- Loading Overlay -->
+    <div v-if="isLoading" class="loading-overlay">
+      <div class="loading-content">
+        <div class="loading-spinner"></div>
+      </div>
     </div>
   </div>
 </template>
@@ -262,6 +272,7 @@ const {
   selectedNodeId,
   allRivers,
   hasAPIKeys,
+  isLoading,
   createRiver,
   loadRiver,
   deleteRiver,
@@ -297,6 +308,10 @@ const hasMultipleNodesSelected = ref(false);
 // Authentication state
 const currentUser = ref<User | null>(null);
 const isAuthenticating = ref(false);
+
+// Local loading states for specific operations
+const isSendingMessage = ref(false);
+const isRiverOperationLoading = ref(false);
 
 // Resizable chat panel
 const chatPanelWidth = ref(400);
@@ -527,30 +542,65 @@ async function handleShowRiverDashboard() {
 }
 
 async function handleCreateFirstRiver() {
-  const river = await createRiver('My First River');
-  showToast(`Created "${river.name}"`, 'success');
+  isRiverOperationLoading.value = true;
+  try {
+    const river = await createRiver('My First River');
+    showToast(`Created "${river.name}"`, 'success');
+  } catch (error) {
+    showToast('Failed to create river', 'error');
+  } finally {
+    isRiverOperationLoading.value = false;
+  }
 }
 
 async function handleCreateRiver(name: string) {
-  const river = await createRiver(name);
-  showToast(`Created "${river.name}"`, 'success');
+  isRiverOperationLoading.value = true;
+  try {
+    const river = await createRiver(name);
+    showToast(`Created "${river.name}"`, 'success');
+  } catch (error) {
+    showToast('Failed to create river', 'error');
+  } finally {
+    isRiverOperationLoading.value = false;
+  }
 }
 
 async function handleOpenRiver(riverId: string) {
-  if (await loadRiver(riverId)) {
-    showToast('River loaded', 'success');
+  isRiverOperationLoading.value = true;
+  try {
+    if (await loadRiver(riverId)) {
+      showToast('River loaded', 'success');
+    }
+  } catch (error) {
+    showToast('Failed to load river', 'error');
+  } finally {
+    isRiverOperationLoading.value = false;
   }
 }
 
 async function handleRenameRiver(riverId: string, newName: string) {
-  await renameRiver(riverId, newName);
-  showToast('River renamed', 'success');
+  isRiverOperationLoading.value = true;
+  try {
+    await renameRiver(riverId, newName);
+    showToast('River renamed', 'success');
+  } catch (error) {
+    showToast('Failed to rename river', 'error');
+  } finally {
+    isRiverOperationLoading.value = false;
+  }
 }
 
 async function handleDeleteRiver(riverId: string) {
-  const river = allRivers.value.find((r) => r.id === riverId);
-  await deleteRiver(riverId);
-  showToast(`Deleted "${river?.name}"`, 'success');
+  isRiverOperationLoading.value = true;
+  try {
+    const river = allRivers.value.find((r) => r.id === riverId);
+    await deleteRiver(riverId);
+    showToast(`Deleted "${river?.name}"`, 'success');
+  } catch (error) {
+    showToast('Failed to delete river', 'error');
+  } finally {
+    isRiverOperationLoading.value = false;
+  }
 }
 
 // Message Handling
@@ -561,6 +611,7 @@ async function handleSendMessage(content: string, models: LLMModel[]) {
     await new Promise(resolve => setTimeout(resolve, 0));
   }
 
+  isSendingMessage.value = true;
   try {
     // If in new root mode, create a new root node (parentId = null)
     const parentId = isNewRootMode.value
@@ -583,6 +634,8 @@ async function handleSendMessage(content: string, models: LLMModel[]) {
     await Promise.all(promises);
   } catch (error) {
     showToast(error instanceof Error ? error.message : 'Failed to send message', 'error');
+  } finally {
+    isSendingMessage.value = false;
   }
 }
 
@@ -749,6 +802,7 @@ function handleSearch() {
 async function handleBranchFromText(nodeId: string, highlightedText: string, userPrompt: string, models: LLMModel[]) {
   if (!currentRiver.value) return;
 
+  isSendingMessage.value = true;
   try {
     // Create branches for all selected models in parallel
     const promises = models.map(model => branchFromText(nodeId, highlightedText, userPrompt, model));
@@ -756,6 +810,8 @@ async function handleBranchFromText(nodeId: string, highlightedText: string, use
     showToast(`Creating ${models.length} branch${models.length > 1 ? 'es' : ''} with selected context...`, 'info');
   } catch (error) {
     showToast(error instanceof Error ? error.message : 'Failed to create branch', 'error');
+  } finally {
+    isSendingMessage.value = false;
   }
 }
 
@@ -1021,6 +1077,42 @@ function handleSelectAllNodes() {
 </script>
 
 <style>
+/* Loading Overlay */
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.loading-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.loading-spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid rgba(255, 255, 255, 0.1);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .resize-handle {
   position: absolute;
   left: 0;

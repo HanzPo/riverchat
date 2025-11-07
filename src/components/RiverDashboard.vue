@@ -22,10 +22,11 @@
           />
           <button
             @click="handleCreateRiver"
-            :disabled="!newRiverName.trim()"
-            class="btn-material px-5 py-2.5 whitespace-nowrap"
+            :disabled="!newRiverName.trim() || isLoading"
+            class="btn-material px-5 py-2.5 whitespace-nowrap flex items-center gap-3"
           >
-            + New River
+            <div v-if="isLoading" class="loading-spinner-small"></div>
+            <span>{{ isLoading ? 'Creating...' : '+ New River' }}</span>
           </button>
         </div>
       </div>
@@ -66,6 +67,7 @@
             <div class="flex gap-2" @click.stop>
               <button
                 @click="handleRenameRiver(river)"
+                :disabled="isLoading"
                 class="btn-material"
                 style="padding: 6px 10px; font-size: 12px;"
                 title="Rename"
@@ -74,6 +76,7 @@
               </button>
               <button
                 @click="handleDeleteRiver(river)"
+                :disabled="isLoading"
                 class="btn-material"
                 style="padding: 6px 10px; font-size: 12px;"
                 title="Delete"
@@ -90,6 +93,14 @@
         <button @click="emit('close')" class="btn-material" style="padding: 8px 16px;">
           Close
         </button>
+      </div>
+
+      <!-- Loading Overlay -->
+      <div v-if="isLoading" class="absolute inset-0 flex items-center justify-center rounded-lg" style="background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(2px);">
+        <div style="display: flex; flex-direction: column; align-items: center;">
+          <div class="loading-spinner" style="margin-bottom: 20px;"></div>
+          <p class="text-sm font-semibold" style="color: var(--color-text-primary);">Processing...</p>
+        </div>
       </div>
     </div>
   </div>
@@ -117,6 +128,7 @@ interface Props {
   isOpen: boolean;
   rivers: River[];
   activeRiverId: string | null;
+  isLoading?: boolean;
 }
 
 interface Emits {
@@ -207,3 +219,30 @@ function getNodeCount(river: River): number {
   return Object.keys(river.nodes).length;
 }
 </script>
+
+<style scoped>
+/* Loading Spinners */
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.loading-spinner-small {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+</style>

@@ -220,14 +220,15 @@
 
            <button
              @click="handleSend"
-             :disabled="!inputText.trim() || !canSend || selectedModels.length === 0"
+             :disabled="!inputText.trim() || !canSend || selectedModels.length === 0 || isSending"
              class="flex items-center justify-center rounded-lg transition-all"
-             :style="(!inputText.trim() || !canSend || selectedModels.length === 0) 
+             :style="(!inputText.trim() || !canSend || selectedModels.length === 0 || isSending) 
                ? 'width: 40px; height: 40px; background: var(--color-border); cursor: not-allowed;'
                : 'width: 40px; height: 40px; background: var(--color-primary); cursor: pointer;'"
-             :title="selectedModels.length > 1 ? `Send to ${selectedModels.length} models` : 'Send message'"
+             :title="isSending ? 'Sending...' : (selectedModels.length > 1 ? `Send to ${selectedModels.length} models` : 'Send message')"
            >
-             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: white;">
+             <div v-if="isSending" class="loading-spinner-small"></div>
+             <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: white;">
                <path d="M12 19V5M5 12l7-7 7 7"/>
              </svg>
            </button>
@@ -264,6 +265,7 @@ interface Props {
   allNodes?: Record<string, MessageNode>;
   apiKeys?: APIKeys;
   settings?: Settings;
+  isSending?: boolean;
 }
 
 interface Emits {
@@ -623,6 +625,22 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* Loading Spinner */
+.loading-spinner-small {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @keyframes blink {
   0%, 50% {
     opacity: 1;
