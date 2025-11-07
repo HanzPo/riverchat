@@ -7,6 +7,7 @@
       :min-zoom="0.2"
       :max-zoom="2"
       :fit-view-on-init="true"
+      :delete-key-code="null"
       @node-click="handleNodeClick"
       @node-double-click="handleNodeDoubleClick"
       @node-context-menu="handleNodeContextMenu"
@@ -655,6 +656,35 @@ function handleCreateRootNode() {
   emit('create-root-node');
 }
 
+function handleKeyboardDelete(event: KeyboardEvent) {
+  // Handle Delete or Backspace key
+  if (event.key === 'Delete' || event.key === 'Backspace') {
+    // Check if user is typing in an input field
+    const target = event.target as HTMLElement;
+    const isTyping = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+    
+    if (isTyping) {
+      // Don't interfere with typing
+      return;
+    }
+    
+    // Get currently selected nodes
+    const selectedNodes = getSelectedNodes.value || [];
+    
+    if (selectedNodes.length > 0) {
+      // Prevent default browser behavior
+      event.preventDefault();
+      
+      // Extract node IDs from selected nodes
+      const nodeIds = selectedNodes.map(node => node.id);
+      
+      // Emit the batch delete event to trigger the proper deletion flow
+      // This will show the confirmation dialog and properly delete nodes with descendants
+      emit('delete-branches-batch', nodeIds);
+    }
+  }
+}
+
 // Close context menu on click outside
 function handleClickOutside(event: MouseEvent) {
   const target = event.target as HTMLElement;
@@ -671,6 +701,9 @@ onMounted(() => {
   // Add click listener for closing context menu
   window.addEventListener('click', handleClickOutside);
   
+  // Add keyboard listener for node deletion
+  window.addEventListener('keydown', handleKeyboardDelete);
+  
   // Find the Vue Flow pane element
   const paneElement = document.querySelector('.vue-flow__pane');
   
@@ -686,6 +719,9 @@ onMounted(() => {
 onUnmounted(() => {
   // Remove click listener
   window.removeEventListener('click', handleClickOutside);
+  
+  // Remove keyboard listener
+  window.removeEventListener('keydown', handleKeyboardDelete);
   
   if (cleanupSelectionListener) {
     cleanupSelectionListener();
