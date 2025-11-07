@@ -358,10 +358,8 @@ watch(
         ? getEnabledModelsList(props.settings.enabledModels, props.settings.availableModels)
         : [];
       if (enabledModels.length > 0) {
-        // Default to Gemma 3n if available, otherwise first free model, otherwise first model
-        const defaultModel = enabledModels.find(m => m.id === 'google/gemma-3n-e4b-it:free') 
-          || enabledModels.find(m => m.isFree) 
-          || enabledModels[0];
+        // Default to first free model, otherwise first model
+        const defaultModel = enabledModels.find(m => m.isFree) || enabledModels[0];
         selectedModels.value = [JSON.stringify(defaultModel)];
       }
     }
@@ -396,7 +394,7 @@ watch(
 
     // If all selected models were removed, default to first enabled model
     if (filteredSelection.length === 0 && enabledModels.length > 0) {
-      const defaultModel = enabledModels.find(m => m.name === 'gemini-2.0-flash-exp') || enabledModels[0];
+      const defaultModel = enabledModels.find(m => m.isFree) || enabledModels[0];
       selectedModels.value = [JSON.stringify(defaultModel)];
     } else if (filteredSelection.length !== selectedModels.value.length) {
       // Only update if something actually changed

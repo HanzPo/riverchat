@@ -362,10 +362,8 @@ watch(
         ? getEnabledModelsList(props.settings.enabledModels, props.settings.availableModels)
         : [];
       if (enabledModels.length > 0) {
-        // Default to Gemma 3n if available, otherwise first free model, otherwise first model
-        const defaultModel = enabledModels.find(m => m.id === 'google/gemma-3n-e4b-it:free') 
-          || enabledModels.find(m => m.isFree) 
-          || enabledModels[0];
+        // Default to first free model, otherwise first model
+        const defaultModel = enabledModels.find(m => m.isFree) || enabledModels[0];
         selectedModels.value = [JSON.stringify(defaultModel)];
       }
     }
