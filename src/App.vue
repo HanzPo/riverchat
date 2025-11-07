@@ -746,8 +746,8 @@ async function handleBranchFromText(nodeId: string, highlightedText: string, use
 async function handleChatModelChanged(models: LLMModel[]) {
   // Save chat model selection to persist across prompts and sessions
   settings.value.lastChatSelectedModels = models;
-  // Persist to database immediately
-  await updateSettings({ lastChatSelectedModels: models });
+  // Persist to database immediately (bypass debounce for real-time persistence)
+  await updateSettings({ lastChatSelectedModels: models }, true);
 }
 
 function handleCloseChatPanel() {
