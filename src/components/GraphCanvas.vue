@@ -16,7 +16,7 @@
       @pane-click="handlePaneClick"
       @pane-context-menu="handlePaneContextMenu"
     >
-      <Background variant="dots" pattern-color="#808080" :gap="30" />
+      <Background variant="dots" pattern-color="#404040" :gap="30" />
       <Controls />
       <MiniMap />
 
@@ -703,11 +703,11 @@ onUnmounted(() => {
   width: 100%;
   height: 100%;
   position: relative;
-  background: #000000;
+  background: #0e0e0e;
 }
 
 :deep(.vue-flow__background) {
-  background-color: #000000;
+  background-color: #0e0e0e;
 }
 
 :deep(.vue-flow__minimap) {
