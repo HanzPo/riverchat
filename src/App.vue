@@ -489,11 +489,6 @@ async function handleSaveAPIKeys(apiKeys: typeof settings.value.apiKeys) {
   await updateAPIKeys(apiKeys);
   showWelcome.value = false;
   showToast('API keys saved successfully', 'success');
-
-  // Create first river if none exists
-  if (allRivers.value.length === 0) {
-    await handleCreateFirstRiver();
-  }
 }
 
 // Settings Management

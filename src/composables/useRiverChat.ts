@@ -71,8 +71,8 @@ export function useRiverChat() {
   }, { deep: true });
 
   // Refresh rivers list
-  async function refreshRivers(): Promise<void> {
-    allRivers.value = await FirestoreStorageService.getRivers();
+  async function refreshRivers(forceRefresh: boolean = false): Promise<void> {
+    allRivers.value = await FirestoreStorageService.getRivers(!forceRefresh);
   }
 
   // River Management
@@ -88,7 +88,8 @@ export function useRiverChat() {
 
     await FirestoreStorageService.saveRiver(river);
     currentRiver.value = river;
-    await refreshRivers();
+    // Force refresh to ensure new river appears immediately
+    await refreshRivers(true);
     return river;
   }
 
@@ -108,7 +109,8 @@ export function useRiverChat() {
       currentRiver.value = null;
       selectedNodeId.value = null;
     }
-    await refreshRivers();
+    // Force refresh to ensure deleted river is removed immediately
+    await refreshRivers(true);
   }
 
   async function renameRiver(riverId: string, newName: string): Promise<void> {
@@ -120,7 +122,8 @@ export function useRiverChat() {
       if (currentRiver.value?.id === riverId) {
         currentRiver.value.name = newName;
       }
-      await refreshRivers();
+      // Force refresh to bypass cache and get immediate update
+      await refreshRivers(true);
     }
   }
 

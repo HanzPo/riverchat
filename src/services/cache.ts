@@ -166,6 +166,13 @@ export class CacheService {
   }
 
   /**
+   * Clear rivers metadata cache (when rivers are modified)
+   */
+  static clearRiversMetadata(): void {
+    localStorage.removeItem(CACHE_KEYS.RIVERS_METADATA);
+  }
+
+  /**
    * Clear all caches
    */
   static clearAll(): void {
