@@ -27,7 +27,7 @@
         </h2>
         <p class="text-xs leading-relaxed font-medium mb-4" style="color: var(--color-text-secondary);">
           With your own OpenRouter API key, you can access hundreds of models from OpenAI, Anthropic, Google, and more.
-          Get your key at <a href="https://openrouter.ai/keys" target="_blank" class="text-primary hover:underline">openrouter.ai/keys</a>
+          Get your key at <a href="https://openrouter.ai/keys" target="_blank" class="underline font-semibold" style="color: var(--color-primary);" rel="noopener noreferrer">openrouter.ai/keys</a>
         </p>
       </div>
 

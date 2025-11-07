@@ -56,7 +56,7 @@
                 @input="handleApiKeyChange"
               />
               <p class="text-xs mt-2" style="color: var(--color-text-tertiary);">
-                Get your API key at <a href="https://openrouter.ai/keys" target="_blank" class="text-primary hover:underline">openrouter.ai/keys</a>
+                Get your API key at <a href="https://openrouter.ai/keys" target="_blank" class="underline font-semibold" style="color: var(--color-primary);" rel="noopener noreferrer">openrouter.ai/keys</a>
               </p>
             </div>
 

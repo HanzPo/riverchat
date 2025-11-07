@@ -240,16 +240,21 @@ import { Folder, Search, HelpCircle, Settings, Plus, User as UserIcon } from 'lu
 import { AuthService } from './services/auth';
 import type { User } from 'firebase/auth';
 
+import { defineAsyncComponent } from 'vue';
+
+// Critical components loaded immediately
 import GraphCanvas from './components/GraphCanvas.vue';
 import ChatHistory from './components/ChatHistory.vue';
-import ChatModal from './components/ChatModal.vue';
-import WelcomeModal from './components/WelcomeModal.vue';
-import SettingsPage from './components/SettingsPage.vue';
-import RiverDashboard from './components/RiverDashboard.vue';
-import MessageViewerModal from './components/MessageViewerModal.vue';
-import ConfirmationModal from './components/ConfirmationModal.vue';
-import KeyboardShortcutsModal from './components/KeyboardShortcutsModal.vue';
-import AuthModal from './components/AuthModal.vue';
+
+// Non-critical components lazy loaded
+const ChatModal = defineAsyncComponent(() => import('./components/ChatModal.vue'));
+const WelcomeModal = defineAsyncComponent(() => import('./components/WelcomeModal.vue'));
+const SettingsPage = defineAsyncComponent(() => import('./components/SettingsPage.vue'));
+const RiverDashboard = defineAsyncComponent(() => import('./components/RiverDashboard.vue'));
+const MessageViewerModal = defineAsyncComponent(() => import('./components/MessageViewerModal.vue'));
+const ConfirmationModal = defineAsyncComponent(() => import('./components/ConfirmationModal.vue'));
+const KeyboardShortcutsModal = defineAsyncComponent(() => import('./components/KeyboardShortcutsModal.vue'));
+const AuthModal = defineAsyncComponent(() => import('./components/AuthModal.vue'));
 
 const {
   currentRiver,

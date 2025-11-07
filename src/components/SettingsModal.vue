@@ -41,7 +41,7 @@
             class="input-material"
           />
           <p class="text-xs mt-2" style="color: var(--color-text-tertiary);">
-            Don't have an API key? Get one at <a href="https://openrouter.ai/keys" target="_blank" class="text-primary hover:underline">openrouter.ai/keys</a>
+            Don't have an API key? Get one at <a href="https://openrouter.ai/keys" target="_blank" class="underline font-semibold" style="color: var(--color-primary);" rel="noopener noreferrer">openrouter.ai/keys</a>
           </p>
         </div>
 
