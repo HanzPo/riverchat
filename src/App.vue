@@ -12,7 +12,7 @@
       </div>
 
       <div class="flex gap-3">
-        <button @click="showRiverDashboard = true" class="btn-material flex items-center gap-2" title="Manage Rivers (Ctrl+K)">
+        <button @click="handleShowRiverDashboard" class="btn-material flex items-center gap-2" title="Manage Rivers (Ctrl+K)">
           <Folder :size="16" />
           <span>Rivers</span>
         </button>
@@ -152,7 +152,7 @@
 
     <RiverDashboard
       :is-open="showRiverDashboard"
-      :rivers="allRivers"
+      :rivers="allRivers || []"
       :active-river-id="currentRiver?.id || null"
       @create="handleCreateRiver"
       @open="handleOpenRiver"
@@ -511,6 +511,10 @@ async function handleSaveSettings(newSettings: typeof settings.value) {
 }
 
 // River Management
+function handleShowRiverDashboard() {
+  showRiverDashboard.value = true;
+}
+
 async function handleCreateFirstRiver() {
   const river = await createRiver('My First River');
   showToast(`Created "${river.name}"`, 'success');

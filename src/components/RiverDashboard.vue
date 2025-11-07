@@ -138,6 +138,9 @@ const deleteConfirmation = ref({
 });
 
 const sortedRivers = computed(() => {
+  if (!props.rivers || !Array.isArray(props.rivers)) {
+    return [];
+  }
   return [...props.rivers].sort((a, b) => {
     return new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime();
   });
@@ -198,6 +201,9 @@ function formatDate(dateString: string): string {
 }
 
 function getNodeCount(river: River): number {
+  if (!river.nodes || typeof river.nodes !== 'object') {
+    return 0;
+  }
   return Object.keys(river.nodes).length;
 }
 </script>
