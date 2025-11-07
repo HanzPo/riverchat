@@ -1,32 +1,225 @@
 /**
- * Import function triggers from their respective submodules:
- *
- * const {onCall} = require("firebase-functions/v2/https");
- * const {onDocumentWritten} = require("firebase-functions/v2/firestore");
- *
- * See a full list of supported triggers at https://firebase.google.com/docs/functions
+ * Firebase Cloud Functions for RiverChat
+ * Proxies API requests to OpenAI and Anthropic to avoid CORS issues
  */
 
 const {setGlobalOptions} = require("firebase-functions");
-const {onRequest} = require("firebase-functions/https");
+const {onRequest} = require("firebase-functions/v2/https");
 const logger = require("firebase-functions/logger");
 
-// For cost control, you can set the maximum number of containers that can be
-// running at the same time. This helps mitigate the impact of unexpected
-// traffic spikes by instead downgrading performance. This limit is a
-// per-function limit. You can override the limit for each function using the
-// `maxInstances` option in the function's options, e.g.
-// `onRequest({ maxInstances: 5 }, (req, res) => { ... })`.
-// NOTE: setGlobalOptions does not apply to functions using the v1 API. V1
-// functions should each use functions.runWith({ maxInstances: 10 }) instead.
-// In the v1 API, each function can only serve one request per container, so
-// this will be the maximum concurrent request count.
-setGlobalOptions({ maxInstances: 10 });
+// Set global options for cost control
+setGlobalOptions({maxInstances: 10});
 
-// Create and deploy your first functions
-// https://firebase.google.com/docs/functions/get-started
+/**
+ * Proxy for OpenAI API requests
+ * Handles both Chat Completions and Responses API with streaming
+ */
+exports.proxyOpenAI = onRequest({cors: true}, async (req, res) => {
+  // Only allow POST requests
+  if (req.method !== "POST") {
+    res.status(405).json({error: "Method not allowed"});
+    return;
+  }
 
-// exports.helloWorld = onRequest((request, response) => {
-//   logger.info("Hello logs!", {structuredData: true});
-//   response.send("Hello from Firebase!");
-// });
+  try {
+    const {apiKey, endpoint, body} = req.body;
+
+    if (!apiKey) {
+      res.status(400).json({error: "API key is required"});
+      return;
+    }
+
+    if (!endpoint) {
+      res.status(400).json({error: "Endpoint is required"});
+      return;
+    }
+
+    logger.info("OpenAI proxy request", {endpoint});
+
+    // Make request to OpenAI
+    const response = await fetch(`https://api.openai.com/v1/${endpoint}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    // Handle error responses
+    if (!response.ok) {
+      const error = await response.json();
+      logger.error("OpenAI API error", error);
+      res.status(response.status).json(error);
+      return;
+    }
+
+    // Set headers for streaming
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+
+    // Stream the response
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+
+    try {
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const {done, value} = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, {stream: true});
+        res.write(chunk);
+      }
+    } finally {
+      reader.releaseLock();
+      res.end();
+    }
+  } catch (error) {
+    logger.error("Proxy error", error);
+    res.status(500).json({error: error.message || "Internal server error"});
+  }
+});
+
+/**
+ * Proxy for Anthropic API requests
+ * Handles Messages API with streaming
+ */
+exports.proxyAnthropic = onRequest({cors: true}, async (req, res) => {
+  // Only allow POST requests
+  if (req.method !== "POST") {
+    res.status(405).json({error: "Method not allowed"});
+    return;
+  }
+
+  try {
+    const {apiKey, body} = req.body;
+
+    if (!apiKey) {
+      res.status(400).json({error: "API key is required"});
+      return;
+    }
+
+    logger.info("Anthropic proxy request");
+
+    // Make request to Anthropic
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify(body),
+    });
+
+    // Handle error responses
+    if (!response.ok) {
+      const error = await response.json();
+      logger.error("Anthropic API error", error);
+      res.status(response.status).json(error);
+      return;
+    }
+
+    // Set headers for streaming
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+
+    // Stream the response
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+
+    try {
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const {done, value} = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, {stream: true});
+        res.write(chunk);
+      }
+    } finally {
+      reader.releaseLock();
+      res.end();
+    }
+  } catch (error) {
+    logger.error("Proxy error", error);
+    res.status(500).json({error: error.message || "Internal server error"});
+  }
+});
+
+/**
+ * Proxy for Google Gemini API requests
+ * Handles streaming requests
+ */
+exports.proxyGoogle = onRequest({cors: true}, async (req, res) => {
+  // Only allow POST requests
+  if (req.method !== "POST") {
+    res.status(405).json({error: "Method not allowed"});
+    return;
+  }
+
+  try {
+    const {apiKey, model, body} = req.body;
+
+    if (!apiKey) {
+      res.status(400).json({error: "API key is required"});
+      return;
+    }
+
+    if (!model) {
+      res.status(400).json({error: "Model is required"});
+      return;
+    }
+
+    logger.info("Google proxy request", {model});
+
+    // Make request to Google
+    const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${apiKey}&alt=sse`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
+        },
+    );
+
+    // Handle error responses
+    if (!response.ok) {
+      const error = await response.json();
+      logger.error("Google API error", error);
+      res.status(response.status).json(error);
+      return;
+    }
+
+    // Set headers for streaming
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+
+    // Stream the response
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+
+    try {
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const {done, value} = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, {stream: true});
+        res.write(chunk);
+      }
+    } finally {
+      reader.releaseLock();
+      res.end();
+    }
+  } catch (error) {
+    logger.error("Proxy error", error);
+    res.status(500).json({error: error.message || "Internal server error"});
+  }
+});

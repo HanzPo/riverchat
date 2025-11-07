@@ -75,7 +75,7 @@
                 </span>
               </div>
               <span v-if="message.model" class="text-xs font-medium text-white/75 overflow-hidden text-ellipsis whitespace-nowrap">
-                {{ message.model.displayName }}
+                {{ message.model.name }}
               </span>
             </div>
 
@@ -149,22 +149,32 @@
             </div>
           </div>
 
-          <div class="flex gap-3 mb-4 items-center">
-            <select v-model="selectedModel" class="select-material flex-1 py-3">
-              <optgroup
-                v-for="provider in modelsByProvider"
-                :key="provider.name"
-                :label="provider.name"
-              >
-                <option
-                  v-for="model in provider.models"
-                  :key="`${model.provider}-${model.name}`"
-                  :value="JSON.stringify(model)"
+          <!-- Model Selection Summary -->
+          <div class="mb-4 p-3 rounded-lg flex items-center justify-between gap-3" style="background: var(--color-background); border: 1px solid var(--color-border);">
+            <div class="flex-1 min-w-0">
+              <div class="text-xs font-bold uppercase tracking-wider mb-1.5" style="color: var(--color-text-tertiary);">
+                Selected Models ({{ parsedSelectedModels.length }})
+              </div>
+              <div v-if="parsedSelectedModels.length > 0" class="flex flex-wrap gap-2">
+                <span
+                  v-for="model in parsedSelectedModels"
+                  :key="model.id"
+                  class="text-xs font-medium px-2.5 py-1 rounded-md"
+                  style="background: var(--color-primary-muted); color: var(--color-primary); border: 1px solid var(--color-primary);"
                 >
-                  {{ model.displayName }}
-                </option>
-              </optgroup>
-            </select>
+                  {{ model.name }}
+                </span>
+              </div>
+              <div v-else class="text-xs font-medium" style="color: var(--color-text-tertiary);">
+                No models selected
+              </div>
+            </div>
+            <button
+              @click="showModelSelectionModal = true"
+              class="btn-material px-4 py-2 text-sm font-semibold whitespace-nowrap"
+            >
+              Select
+            </button>
           </div>
 
           <textarea
@@ -179,10 +189,10 @@
           <div class="flex justify-end gap-3 mt-4">
             <button
               @click="handleSend"
-              :disabled="!inputText.trim() || !canSend"
+              :disabled="!inputText.trim() || !canSend || selectedModels.length === 0"
               class="btn-material px-6 py-3 font-bold text-base"
             >
-              Send
+              Send{{ selectedModels.length > 1 ? ` to ${selectedModels.length} Models` : '' }}
             </button>
           </div>
         </div>
@@ -197,17 +207,27 @@
         @branch="handleSetBranchContext"
       />
     </Teleport>
+
+    <!-- Model Selection Modal -->
+    <ModelSelectionModal
+      :is-open="showModelSelectionModal"
+      :enabled-models="enabledModels"
+      :initial-selected-models="parsedSelectedModels"
+      @confirm="handleModelSelectionConfirm"
+      @close="showModelSelectionModal = false"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue';
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
-import type { MessageNode, LLMModel } from '../types';
-import { AVAILABLE_MODELS } from '../types';
+import type { MessageNode, LLMModel, APIKeys, Settings } from '../types';
+import { getEnabledModelsList } from '../types';
 import { User, Bot, GitBranch, AlertTriangle, MessageCircle, X } from 'lucide-vue-next';
 import TextHighlightPopover from './TextHighlightPopover.vue';
+import ModelSelectionModal from './ModelSelectionModal.vue';
 
 interface Props {
   isOpen: boolean;
@@ -216,23 +236,26 @@ interface Props {
   lastUsedModel: LLMModel | null;
   isNewRootMode?: boolean;
   allNodes?: Record<string, MessageNode>;
+  apiKeys?: APIKeys;
+  settings?: Settings;
 }
 
 interface Emits {
   (e: 'close'): void;
-  (e: 'send', content: string, model: LLMModel): void;
+  (e: 'send', content: string, models: LLMModel[]): void;
   (e: 'node-select', nodeId: string): void;
-  (e: 'branch-from-text', nodeId: string, highlightedText: string, elaborationPrompt: string, model: LLMModel): void;
-  (e: 'model-changed', model: LLMModel): void;
+  (e: 'branch-from-text', nodeId: string, highlightedText: string, elaborationPrompt: string, models: LLMModel[]): void;
+  (e: 'chat-model-changed', models: LLMModel[]): void;
 }
 
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
 const inputText = ref('');
-const selectedModel = ref('');
+const selectedModels = ref<string[]>([]);
 const messagesContainer = ref<HTMLElement | null>(null);
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
+const showModelSelectionModal = ref(false);
 
 // Text selection and highlight popover state
 const highlightPopover = ref({
@@ -270,52 +293,99 @@ function renderMarkdown(content: string): string {
   return DOMPurify.sanitize(html);
 }
 
-// Group models by provider
-const modelsByProvider = computed(() => {
-  const providers: Record<string, { name: string; models: LLMModel[] }> = {
-    openai: { name: 'OpenAI', models: [] },
-    anthropic: { name: 'Anthropic', models: [] },
-    google: { name: 'Google', models: [] },
-  };
-
-  AVAILABLE_MODELS.forEach((model) => {
-    const provider = providers[model.provider];
-    if (provider) {
-      provider.models.push(model);
-    }
-  });
-
-  return Object.values(providers);
+// Get enabled models from settings
+const enabledModels = computed(() => {
+  if (!props.settings?.enabledModels || !props.settings?.availableModels) {
+    return [];
+  }
+  return getEnabledModelsList(props.settings.enabledModels, props.settings.availableModels);
 });
 
-// Initialize with last used model or default to GPT-4o
+// Parse selected models from JSON strings
+const parsedSelectedModels = computed(() => {
+  return selectedModels.value
+    .map(jsonStr => {
+      try {
+        return JSON.parse(jsonStr) as LLMModel;
+      } catch {
+        return null;
+      }
+    })
+    .filter((m): m is LLMModel => m !== null);
+});
+
+// Track if we're currently restoring from saved state to prevent loops
+const isRestoringSelection = ref(false);
+
+// Initialize from lastChatSelectedModels (persists across prompts)
 watch(
-  () => props.lastUsedModel,
-  (model) => {
-    if (model && !selectedModel.value) {
-      selectedModel.value = JSON.stringify(model);
+  () => props.settings?.lastChatSelectedModels,
+  (lastSelected) => {
+    isRestoringSelection.value = true;
+    if (lastSelected && lastSelected.length > 0) {
+      // Restore last selected models from previous session
+      selectedModels.value = lastSelected.map(m => JSON.stringify(m));
+    } else if (selectedModels.value.length === 0) {
+      // No previous selection, default to first available model
+      const enabledModels = props.settings?.enabledModels && props.settings?.availableModels
+        ? getEnabledModelsList(props.settings.enabledModels, props.settings.availableModels)
+        : [];
+      if (enabledModels.length > 0) {
+        // Default to Gemma 3n if available, otherwise first free model, otherwise first model
+        const defaultModel = enabledModels.find(m => m.id === 'google/gemma-3n-e4b-it:free') 
+          || enabledModels.find(m => m.isFree) 
+          || enabledModels[0];
+        selectedModels.value = [JSON.stringify(defaultModel)];
+      }
     }
+    // Use nextTick to reset the flag after the update completes
+    nextTick(() => {
+      isRestoringSelection.value = false;
+    });
   },
-  { immediate: true }
+  { immediate: true, deep: true }
 );
 
-// Set default model to GPT-4o if none selected
-if (!selectedModel.value) {
-  const gpt4o = AVAILABLE_MODELS.find(m => m.name === 'gpt-4o');
-  if (gpt4o) {
-    selectedModel.value = JSON.stringify(gpt4o);
-  } else if (AVAILABLE_MODELS.length > 0) {
-    // Fallback to first available model if GPT-4o not found
-    selectedModel.value = JSON.stringify(AVAILABLE_MODELS[0]);
-  }
-}
+// Watch for changes in enabled models and filter out models that are no longer available
+watch(
+  () => props.settings?.enabledModels,
+  (enabledModelsRecord) => {
+    if (!enabledModelsRecord || !props.settings?.availableModels) {
+      selectedModels.value = [];
+      return;
+    }
 
-// Watch for model changes and persist to settings
-watch(selectedModel, (newModel) => {
-  if (newModel) {
-    const model = JSON.parse(newModel) as LLMModel;
-    // Emit model change so parent can save it
-    emit('model-changed', model);
+    const enabledModels = getEnabledModelsList(enabledModelsRecord, props.settings.availableModels);
+    if (enabledModels.length === 0) {
+      selectedModels.value = [];
+      return;
+    }
+
+    // Get set of currently enabled model strings for fast lookup
+    const enabledModelStrings = new Set(enabledModels.map(m => JSON.stringify(m)));
+
+    // Filter currently selected models to only include enabled ones
+    const filteredSelection = selectedModels.value.filter(ms => enabledModelStrings.has(ms));
+
+    // If all selected models were removed, default to first enabled model
+    if (filteredSelection.length === 0 && enabledModels.length > 0) {
+      const defaultModel = enabledModels.find(m => m.isFree) || enabledModels[0];
+      selectedModels.value = [JSON.stringify(defaultModel)];
+    } else if (filteredSelection.length !== selectedModels.value.length) {
+      // Only update if something actually changed
+      selectedModels.value = filteredSelection;
+    }
+  },
+  { deep: true }
+);
+
+// Watch for model changes and persist to lastChatSelectedModels (persists across prompts)
+// Only emit if not currently restoring to prevent infinite loops
+watch(selectedModels, (newModels) => {
+  if (!isRestoringSelection.value && newModels && newModels.length > 0) {
+    const models = newModels.map(m => JSON.parse(m) as LLMModel);
+    // Emit to save to lastChatSelectedModels
+    emit('chat-model-changed', models);
   }
 });
 
@@ -388,20 +458,26 @@ function handleKeydown(event: KeyboardEvent) {
   }
 }
 
+function handleModelSelectionConfirm(models: LLMModel[]) {
+  // Convert models to JSON strings for selectedModels
+  selectedModels.value = models.map(m => JSON.stringify(m));
+  showModelSelectionModal.value = false;
+}
+
 function handleSend() {
-  if (inputText.value.trim() && selectedModel.value && canSend.value) {
-    const model = JSON.parse(selectedModel.value) as LLMModel;
-    
+  if (inputText.value.trim() && selectedModels.value.length > 0 && canSend.value) {
+    const models = selectedModels.value.map(m => JSON.parse(m) as LLMModel);
+
     // Check if we have branch context
     if (branchContext.value.text && branchContext.value.sourceNodeId) {
       // Send as a branch with context
-      emit('branch-from-text', branchContext.value.sourceNodeId, branchContext.value.text, inputText.value.trim(), model);
+      emit('branch-from-text', branchContext.value.sourceNodeId, branchContext.value.text, inputText.value.trim(), models);
       clearBranchContext();
     } else {
       // Regular message
-      emit('send', inputText.value.trim(), model);
+      emit('send', inputText.value.trim(), models);
     }
-    
+
     inputText.value = '';
   }
 }
@@ -503,13 +579,19 @@ function handleDocumentClick(event: MouseEvent) {
   }
 }
 
-// Add document click listener
-if (typeof window !== 'undefined') {
+// Lifecycle hooks for event listener cleanup
+onMounted(() => {
+  // Add document click listener
   // Use capture phase and a small delay to avoid interfering with selection
   setTimeout(() => {
     document.addEventListener('mousedown', handleDocumentClick);
   }, 0);
-}
+});
+
+onUnmounted(() => {
+  // Remove document click listener to prevent memory leaks
+  document.removeEventListener('mousedown', handleDocumentClick);
+});
 </script>
 
 <style scoped>

@@ -4,11 +4,12 @@ const STORAGE_KEY = 'riverchat_data';
 
 const DEFAULT_SETTINGS: Settings = {
   apiKeys: {
-    openai: '',
-    anthropic: '',
-    google: '',
+    openrouter: '',
   },
   lastUsedModel: null,
+  enabledModels: {},
+  lastChatSelectedModels: [],
+  availableModels: [],
 };
 
 const DEFAULT_DATA: RiverChatData = {
@@ -104,7 +105,7 @@ export class StorageService {
 
   static hasAPIKeys(): boolean {
     const apiKeys = this.getAPIKeys();
-    return !!(apiKeys.openai || apiKeys.anthropic || apiKeys.google);
+    return !!apiKeys.openrouter;
   }
 
   static getActiveRiverId(): string | null {

@@ -1,44 +1,82 @@
 import { ref, computed, watch } from 'vue';
 import { v4 as uuidv4 } from 'uuid';
-import type { River, MessageNode, LLMModel, Settings } from '../types';
-import { StorageService } from '../services/storage';
+import type { River, MessageNode, LLMModel, Settings, APIKeys } from '../types';
+import { getDefaultEnabledModelsRecord, validateSelectedModels, SHARED_OPENROUTER_API_KEY } from '../types';
+import { FirestoreStorageService } from '../services/firestore-storage';
 import { LLMAPIService } from '../services/llm-api';
+import { getAvailableModels, filterModelsByApiKey, sortModels } from '../services/openrouter';
+
+// Simple debounce utility
+function debounce<T extends (...args: any[]) => any>(
+  func: T,
+  wait: number
+): (...args: Parameters<T>) => void {
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+
+  return function executedFunction(...args: Parameters<T>) {
+    const later = () => {
+      timeout = null;
+      func(...args);
+    };
+
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+    timeout = setTimeout(later, wait);
+  };
+}
 
 // Global state
 const currentRiver = ref<River | null>(null);
-const settings = ref<Settings>(StorageService.getSettings());
+const settings = ref<Settings>({ apiKeys: { openrouter: '' }, lastUsedModel: null, enabledModels: {}, lastChatSelectedModels: [], availableModels: [] });
 const selectedNodeId = ref<string | null>(null);
-const riversUpdateTrigger = ref(0); // Trigger to force re-computation of rivers list
+const allRivers = ref<River[]>([]);
+const hasAPIKeys = ref(false);
+const isLoading = ref(false);
+const isInitializing = ref(true); // Flag to prevent auto-save during initial load
 
 export function useRiverChat() {
-  // Computed
-  const allRivers = computed(() => {
-    void riversUpdateTrigger.value; // Force reactivity
-    return StorageService.getRivers();
-  });
-  
   const selectedNode = computed(() => {
     if (!currentRiver.value || !selectedNodeId.value) return null;
     return currentRiver.value.nodes[selectedNodeId.value] || null;
   });
 
-  const hasAPIKeys = computed(() => StorageService.hasAPIKeys());
+  // Debounced save function to reduce Firestore writes
+  const debouncedSaveRiver = debounce(async (river: River) => {
+    await FirestoreStorageService.saveRiver(river);
+  }, 1000); // Save at most once per second
 
-  // Save current river whenever it changes
+  // Debounced save for settings (reduce writes)
+  const debouncedSaveSettings = debounce(async (newSettings: Settings) => {
+    console.log('[useRiverChat] Auto-saving settings to Firestore (debounced)');
+    await FirestoreStorageService.saveSettings(newSettings);
+    hasAPIKeys.value = await FirestoreStorageService.hasAPIKeys();
+  }, 2000); // Save at most once per 2 seconds
+
+  // Save current river whenever it changes (debounced)
   watch(currentRiver, (river) => {
     if (river) {
-      StorageService.saveRiver(river);
-      StorageService.setActiveRiverId(river.id);
+      debouncedSaveRiver(river);
     }
   }, { deep: true });
 
-  // Save settings whenever they change
-  watch(settings, (newSettings) => {
-    StorageService.saveSettings(newSettings);
+  // Save settings whenever they change (but skip during initialization to preserve cloud data)
+  watch(settings, async (newSettings) => {
+    if (isInitializing.value) {
+      console.log('[useRiverChat] Skipping auto-save during initialization');
+      return;
+    }
+    // Use debounced save to reduce writes
+    debouncedSaveSettings(newSettings);
   }, { deep: true });
 
+  // Refresh rivers list
+  async function refreshRivers(): Promise<void> {
+    allRivers.value = await FirestoreStorageService.getRivers();
+  }
+
   // River Management
-  function createRiver(name: string): River {
+  async function createRiver(name: string): Promise<River> {
     const river: River = {
       id: uuidv4(),
       name,
@@ -47,15 +85,15 @@ export function useRiverChat() {
       nodes: {},
       rootNodeId: null,
     };
-    
-    StorageService.saveRiver(river);
+
+    await FirestoreStorageService.saveRiver(river);
     currentRiver.value = river;
-    riversUpdateTrigger.value++; // Trigger rivers list update
+    await refreshRivers();
     return river;
   }
 
-  function loadRiver(riverId: string): boolean {
-    const river = StorageService.getRiver(riverId);
+  async function loadRiver(riverId: string): Promise<boolean> {
+    const river = await FirestoreStorageService.getRiver(riverId);
     if (river) {
       currentRiver.value = river;
       selectedNodeId.value = null;
@@ -64,25 +102,25 @@ export function useRiverChat() {
     return false;
   }
 
-  function deleteRiver(riverId: string): void {
-    StorageService.deleteRiver(riverId);
+  async function deleteRiver(riverId: string): Promise<void> {
+    await FirestoreStorageService.deleteRiver(riverId);
     if (currentRiver.value?.id === riverId) {
       currentRiver.value = null;
       selectedNodeId.value = null;
     }
-    riversUpdateTrigger.value++; // Trigger rivers list update
+    await refreshRivers();
   }
 
-  function renameRiver(riverId: string, newName: string): void {
-    const river = StorageService.getRiver(riverId);
+  async function renameRiver(riverId: string, newName: string): Promise<void> {
+    const river = await FirestoreStorageService.getRiver(riverId);
     if (river) {
       river.name = newName;
       river.lastModified = new Date().toISOString();
-      StorageService.saveRiver(river);
+      await FirestoreStorageService.saveRiver(river);
       if (currentRiver.value?.id === riverId) {
         currentRiver.value.name = newName;
       }
-      riversUpdateTrigger.value++; // Trigger rivers list update
+      await refreshRivers();
     }
   }
 
@@ -91,22 +129,22 @@ export function useRiverChat() {
     const BASE_WIDTH = 300; // Average node width (min 280, max 320)
     const BASE_HEIGHT = 120; // Base height for header, timestamp, etc.
     const BRANCH_METADATA_HEIGHT = 80; // Extra height for branch metadata
-    
+
     let estimatedHeight = BASE_HEIGHT;
-    
+
     // Add height based on content length (accounting for word wrap at ~300px width)
     const contentLength = node.content.length;
     const estimatedLines = Math.ceil(contentLength / 40); // ~40 chars per line at 300px
     estimatedHeight += estimatedLines * 20; // ~20px per line
-    
+
     // Add extra height for branch metadata
     if (node.branchMetadata) {
       estimatedHeight += BRANCH_METADATA_HEIGHT;
     }
-    
+
     // Cap at reasonable max
     estimatedHeight = Math.min(estimatedHeight, 400);
-    
+
     return { width: BASE_WIDTH, height: estimatedHeight };
   }
 
@@ -120,7 +158,7 @@ export function useRiverChat() {
     if (!parentId) {
       // This is a new root node - find all existing root nodes
       const rootNodes = Object.values(currentRiver.value.nodes).filter(n => !n.parentId);
-      
+
       if (rootNodes.length === 0) {
         // First node ever
         return { x: 0, y: 0 };
@@ -130,7 +168,7 @@ export function useRiverChat() {
       const allPositions = Object.values(currentRiver.value.nodes)
         .map(n => n.position)
         .filter(p => p !== undefined) as { x: number; y: number }[];
-      
+
       if (allPositions.length === 0) {
         // No positions stored yet, use default spacing
         return { x: rootNodes.length * 500, y: 0 };
@@ -141,12 +179,12 @@ export function useRiverChat() {
       const rightmostNode = Object.values(currentRiver.value.nodes).find(
         n => n.position?.x === maxX
       );
-      
+
       if (rightmostNode) {
         const nodeDims = estimateNodeDimensions(rightmostNode);
         return { x: maxX + nodeDims.width + BASE_HORIZONTAL_SPACING, y: 0 };
       }
-      
+
       return { x: maxX + 380, y: 0 };
     }
 
@@ -169,25 +207,25 @@ export function useRiverChat() {
 
     if (siblings.length === 0) {
       // First child - position directly below parent
-      return { 
-        x: parentPos.x, 
-        y: parentPos.y + parentDims.height + BASE_VERTICAL_SPACING 
+      return {
+        x: parentPos.x,
+        y: parentPos.y + parentDims.height + BASE_VERTICAL_SPACING
       };
     }
 
     // Position to the right of existing siblings
     const siblingPositions = siblings.map(s => s.position!);
     const maxSiblingX = Math.max(...siblingPositions.map(p => p.x));
-    
+
     // Find the rightmost sibling to calculate proper spacing
     const rightmostSibling = siblings.find(s => s.position?.x === maxSiblingX);
     let horizontalSpacing = 380; // Default
-    
+
     if (rightmostSibling) {
       const siblingDims = estimateNodeDimensions(rightmostSibling);
       horizontalSpacing = siblingDims.width + BASE_HORIZONTAL_SPACING;
     }
-    
+
     return {
       x: maxSiblingX + horizontalSpacing,
       y: parentPos.y + parentDims.height + BASE_VERTICAL_SPACING
@@ -417,12 +455,28 @@ export function useRiverChat() {
   }
 
   // Settings Management
-  function updateSettings(newSettings: Partial<Settings>): void {
+  async function updateSettings(newSettings: Partial<Settings>): Promise<void> {
+    console.log('[useRiverChat] updateSettings called with:', {
+      hasAPIKeys: !!newSettings.apiKeys?.openrouter,
+      apiKeys: newSettings.apiKeys ? {
+        openrouter: newSettings.apiKeys.openrouter ? `${newSettings.apiKeys.openrouter.substring(0, 10)}...` : 'empty'
+      } : 'no apiKeys property',
+      newSettings
+    });
+
     settings.value = { ...settings.value, ...newSettings };
+
+    console.log('[useRiverChat] After merge, settings.value.apiKeys:', {
+      openrouter: settings.value.apiKeys.openrouter ? `${settings.value.apiKeys.openrouter.substring(0, 10)}...` : 'empty'
+    });
+
+    await FirestoreStorageService.saveSettings(settings.value);
   }
 
-  function updateAPIKeys(apiKeys: Partial<typeof settings.value.apiKeys>): void {
-    settings.value.apiKeys = { ...settings.value.apiKeys, ...apiKeys };
+  async function updateAPIKeys(apiKeys: APIKeys): Promise<void> {
+    settings.value.apiKeys = apiKeys;
+    await FirestoreStorageService.saveAPIKeys(apiKeys);
+    hasAPIKeys.value = await FirestoreStorageService.hasAPIKeys();
   }
 
   // Selection
@@ -430,11 +484,144 @@ export function useRiverChat() {
     selectedNodeId.value = nodeId;
   }
 
-  // Initialize
-  function initialize(): void {
-    const activeRiverId = StorageService.getActiveRiverId();
-    if (activeRiverId) {
-      loadRiver(activeRiverId);
+  // Clear all state (for logout)
+  function clearState(): void {
+    currentRiver.value = null;
+    selectedNodeId.value = null;
+  }
+
+  // Initialize - optimized with caching
+  async function initialize(forceRefresh: boolean = false): Promise<void> {
+    isLoading.value = true;
+    isInitializing.value = true; // Prevent auto-save during load
+    try {
+      // Load settings from cache first for instant UI, then sync in background
+      console.log('[useRiverChat] Loading settings from storage...');
+      settings.value = await FirestoreStorageService.getSettings(!forceRefresh);
+      console.log('[useRiverChat] Settings loaded successfully');
+
+      // Check API keys
+      hasAPIKeys.value = await FirestoreStorageService.hasAPIKeys();
+
+      // Use cached models immediately if available
+      if (!forceRefresh && settings.value.availableModels && settings.value.availableModels.length > 0) {
+        console.log(`[useRiverChat] Using ${settings.value.availableModels.length} cached models`);
+        isLoading.value = false;
+        isInitializing.value = false;
+        
+        // Fetch rivers after showing cached settings
+        await refreshRivers();
+        
+        // Load the most recent river if available
+        if (allRivers.value && allRivers.value.length > 0 && allRivers.value[0]) {
+          await loadRiver(allRivers.value[0].id);
+        }
+        
+        // Fetch fresh models in background (non-blocking)
+        fetchModelsInBackground();
+        return;
+      }
+
+      // Fetch available models from OpenRouter (if no cache or force refresh)
+      console.log('[useRiverChat] Fetching models from OpenRouter...');
+      try {
+        const allModels = await getAvailableModels();
+        const apiKey = settings.value.apiKeys.openrouter || SHARED_OPENROUTER_API_KEY;
+
+        // Filter models based on API key (free models only for shared key)
+        const filteredModels = filterModelsByApiKey(allModels, apiKey);
+        const sortedModels = sortModels(filteredModels);
+
+        // Update available models in settings
+        settings.value.availableModels = sortedModels;
+        console.log(`[useRiverChat] Loaded ${sortedModels.length} models (${apiKey === SHARED_OPENROUTER_API_KEY ? 'free only' : 'all'})`);
+
+        // If no models are enabled, enable default models
+        if (!settings.value.enabledModels || Object.keys(settings.value.enabledModels).length === 0) {
+          settings.value.enabledModels = getDefaultEnabledModelsRecord(sortedModels);
+          console.log('[useRiverChat] Initialized default enabled models');
+        } else {
+          // Clean up enabled models - remove any that are no longer available
+          const availableModelIds = new Set(sortedModels.map(m => m.id));
+          const cleanedEnabledModels: Record<string, boolean> = {};
+          Object.keys(settings.value.enabledModels).forEach(modelId => {
+            if (availableModelIds.has(modelId) && settings.value.enabledModels![modelId]) {
+              cleanedEnabledModels[modelId] = true;
+            }
+          });
+          settings.value.enabledModels = cleanedEnabledModels;
+        }
+
+        // Validate and clean up lastChatSelectedModels based on available and enabled models
+        if (settings.value.lastChatSelectedModels && settings.value.lastChatSelectedModels.length > 0) {
+          const validatedModels = validateSelectedModels(
+            settings.value.lastChatSelectedModels,
+            sortedModels,
+            settings.value.enabledModels
+          );
+          settings.value.lastChatSelectedModels = validatedModels;
+          console.log(`[useRiverChat] Validated chat selected models: ${validatedModels.length} valid models`);
+        }
+
+        // Save updated settings (this will save availableModels to storage)
+        await FirestoreStorageService.saveSettings(settings.value);
+      } catch (error) {
+        console.error('[useRiverChat] Failed to fetch models from OpenRouter:', error);
+        // Use cached models if available
+        if (settings.value.availableModels && settings.value.availableModels.length > 0) {
+          console.log('[useRiverChat] Using cached models');
+        } else {
+          console.error('[useRiverChat] No cached models available');
+        }
+      }
+
+      // Load rivers
+      await refreshRivers();
+
+      // Load the most recent river if available
+      if (allRivers.value && allRivers.value.length > 0 && allRivers.value[0]) {
+        await loadRiver(allRivers.value[0].id);
+      }
+    } catch (error) {
+      console.error('Failed to initialize:', error);
+    } finally {
+      isLoading.value = false;
+      // Enable auto-save after initialization complete
+      isInitializing.value = false;
+      console.log('[useRiverChat] Initialization complete, auto-save enabled');
+    }
+  }
+
+  // Background model fetching (non-blocking)
+  async function fetchModelsInBackground(): Promise<void> {
+    try {
+      console.log('[useRiverChat] Fetching fresh models in background...');
+      const allModels = await getAvailableModels();
+      const apiKey = settings.value.apiKeys.openrouter || SHARED_OPENROUTER_API_KEY;
+
+      const filteredModels = filterModelsByApiKey(allModels, apiKey);
+      const sortedModels = sortModels(filteredModels);
+
+      // Only update if models have changed
+      if (JSON.stringify(sortedModels) !== JSON.stringify(settings.value.availableModels)) {
+        console.log('[useRiverChat] Models updated in background');
+        settings.value.availableModels = sortedModels;
+        
+        // Clean up enabled models
+        const availableModelIds = new Set(sortedModels.map(m => m.id));
+        const cleanedEnabledModels: Record<string, boolean> = {};
+        Object.keys(settings.value.enabledModels || {}).forEach(modelId => {
+          if (availableModelIds.has(modelId) && settings.value.enabledModels![modelId]) {
+            cleanedEnabledModels[modelId] = true;
+          }
+        });
+        settings.value.enabledModels = cleanedEnabledModels;
+        
+        // Save to storage (will be debounced)
+        await FirestoreStorageService.saveSettings(settings.value);
+      }
+    } catch (error) {
+      console.error('[useRiverChat] Background model fetch failed:', error);
     }
   }
 
@@ -443,17 +630,19 @@ export function useRiverChat() {
     currentRiver,
     settings,
     selectedNodeId,
-    
-    // Computed
     allRivers,
-    selectedNode,
     hasAPIKeys,
+    isLoading,
+
+    // Computed
+    selectedNode,
 
     // River methods
     createRiver,
     loadRiver,
     deleteRiver,
     renameRiver,
+    refreshRivers,
 
     // Node methods
     createUserNode,
@@ -473,8 +662,10 @@ export function useRiverChat() {
     // Selection methods
     selectNode,
 
+    // State management
+    clearState,
+
     // Initialization
     initialize,
   };
 }
-

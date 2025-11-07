@@ -5,58 +5,46 @@
         <h1 class="text-2xl font-semibold mb-3" style="color: var(--color-text-primary); letter-spacing: -0.02em;">
           Welcome to RiverChat 🌊
         </h1>
-        <p class="text-sm leading-relaxed font-medium" style="color: var(--color-text-secondary);">
+        <p class="text-sm leading-relaxed font-medium mb-4" style="color: var(--color-text-secondary);">
           RiverChat is a non-linear chat application that visualizes conversations as branching rivers.
-          To get started, please enter at least one API key.
+          Each conversation can branch into multiple paths, creating a tree-like structure of ideas.
+        </p>
+
+        <div class="rounded-lg p-4" style="background: var(--color-success-bg); border: 1px solid var(--color-success);">
+          <p class="text-sm leading-relaxed font-semibold mb-2" style="color: var(--color-text-primary);">
+            🎉 Start Using RiverChat Right Away!
+          </p>
+          <p class="text-xs leading-relaxed" style="color: var(--color-text-secondary);">
+            You can start chatting immediately using our <strong>shared API key</strong> with access to free models.
+            No API keys required! Simply close this modal and create your first river.
+          </p>
+        </div>
+      </div>
+
+      <div class="mb-4">
+        <h2 class="text-base font-semibold mb-2" style="color: var(--color-text-primary);">
+          Want Access to All Models? Add Your OpenRouter API Key (Optional)
+        </h2>
+        <p class="text-xs leading-relaxed font-medium mb-4" style="color: var(--color-text-secondary);">
+          With your own OpenRouter API key, you can access hundreds of models from OpenAI, Anthropic, Google, and more.
+          Get your key at <a href="https://openrouter.ai/keys" target="_blank" class="text-primary hover:underline">openrouter.ai/keys</a>
         </p>
       </div>
 
       <div class="flex flex-col gap-5 mb-6">
-        <!-- OpenAI -->
+        <!-- OpenRouter -->
         <div>
           <label class="block mb-2 font-medium text-xs" style="color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">
-            OpenAI API Key
+            OpenRouter API Key
           </label>
           <input
-            v-model="apiKeys.openai"
+            v-model="apiKeys.openrouter"
             type="password"
-            placeholder="sk-..."
+            placeholder="sk-or-v1-..."
             class="input-material"
           />
           <p class="text-xs mt-2 font-medium" style="color: var(--color-text-tertiary);">
-            For GPT-4o, GPT-4 Turbo, etc.
-          </p>
-        </div>
-
-        <!-- Anthropic -->
-        <div>
-          <label class="block mb-2 font-medium text-xs" style="color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">
-            Anthropic API Key
-          </label>
-          <input
-            v-model="apiKeys.anthropic"
-            type="password"
-            placeholder="sk-ant-..."
-            class="input-material"
-          />
-          <p class="text-xs mt-2 font-medium" style="color: var(--color-text-tertiary);">
-            For Claude 3.5 Sonnet, Opus, etc.
-          </p>
-        </div>
-
-        <!-- Google -->
-        <div>
-          <label class="block mb-2 font-medium text-xs" style="color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">
-            Google Gemini API Key
-          </label>
-          <input
-            v-model="apiKeys.google"
-            type="password"
-            placeholder="AIza..."
-            class="input-material"
-          />
-          <p class="text-xs mt-2 font-medium" style="color: var(--color-text-tertiary);">
-            For Gemini 2.0 Flash, Gemini 1.5 Pro, etc.
+            Access to GPT-4, Claude, Gemini, and hundreds of other models
           </p>
         </div>
       </div>
@@ -64,8 +52,8 @@
       <!-- Security Notice -->
       <div class="rounded-lg p-4 mb-6" style="background: var(--color-info-bg); border: 1px solid var(--color-info);">
         <p class="text-xs leading-relaxed" style="color: var(--color-text-primary);">
-          🔒 <strong class="font-semibold">Privacy Note:</strong> Your API keys are stored securely in your browser's local storage
-          and are never sent to any server except the selected LLM provider.
+          🔒 <strong class="font-semibold">Privacy Note:</strong> Your API keys are encrypted and synced with your account.
+          They are never sent to any server except OpenRouter.
         </p>
       </div>
 
@@ -73,23 +61,18 @@
       <div class="flex justify-end gap-3">
         <button
           @click="handleSave"
-          :disabled="!hasAtLeastOneKey"
           class="btn-material"
           style="padding: 10px 24px; font-weight: 600; font-size: 14px; background: var(--color-primary-muted); color: var(--color-primary); border-color: var(--color-primary);"
         >
           Get Started
         </button>
       </div>
-
-      <p v-if="!hasAtLeastOneKey" class="text-xs text-right mt-2.5 font-semibold" style="color: var(--color-warning);">
-        Please enter at least one API key to continue
-      </p>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref } from 'vue';
 import type { APIKeys } from '../types';
 
 interface Props {
@@ -109,19 +92,11 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<Emits>();
 
 const apiKeys = ref<APIKeys>({
-  openai: '',
-  anthropic: '',
-  google: '',
-});
-
-const hasAtLeastOneKey = computed(() => {
-  return !!(apiKeys.value.openai || apiKeys.value.anthropic || apiKeys.value.google);
+  openrouter: '',
 });
 
 function handleSave() {
-  if (hasAtLeastOneKey.value) {
-    emit('save', apiKeys.value);
-  }
+  emit('save', apiKeys.value);
 }
 
 function onBackdropClick() {

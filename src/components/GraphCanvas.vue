@@ -663,16 +663,14 @@ function handleClickOutside(event: MouseEvent) {
   }
 }
 
-// Add click listener
-if (typeof window !== 'undefined') {
-  window.addEventListener('click', handleClickOutside);
-}
-
 // Setup selection box on pane
 // We need to detect right-click on the pane to start selection box
 let cleanupSelectionListener: (() => void) | null = null;
 
 onMounted(() => {
+  // Add click listener for closing context menu
+  window.addEventListener('click', handleClickOutside);
+  
   // Find the Vue Flow pane element
   const paneElement = document.querySelector('.vue-flow__pane');
   
@@ -686,6 +684,9 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  // Remove click listener
+  window.removeEventListener('click', handleClickOutside);
+  
   if (cleanupSelectionListener) {
     cleanupSelectionListener();
   }

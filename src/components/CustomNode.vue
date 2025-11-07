@@ -25,7 +25,7 @@
         <span>{{ data.type === 'user' ? 'USER' : 'AI' }}</span>
       </span>
       <span v-if="data.model" class="text-xs font-medium overflow-hidden text-ellipsis whitespace-nowrap" style="color: var(--color-text-secondary);">
-        {{ data.model.displayName }}
+        {{ data.model.name }}
       </span>
     </div>
 
