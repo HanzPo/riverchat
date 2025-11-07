@@ -42,6 +42,14 @@ export class FirestoreStorageService {
       return this.getLocalRivers();
     }
 
+    // Try cache first
+    if (useCache) {
+      const cached = CacheService.getCachedRiversMetadata();
+      if (cached) {
+        return cached;
+      }
+    }
+
     try {
       const riversRef = collection(db, 'users', user.uid, 'rivers');
       const snapshot = await getDocs(riversRef);
