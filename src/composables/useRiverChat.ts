@@ -34,6 +34,7 @@ const allRivers = ref<River[]>([]);
 const hasAPIKeys = ref(false);
 const isLoading = ref(false);
 const isInitializing = ref(true); // Flag to prevent auto-save during initial load
+const isSavingImmediately = ref(false); // Flag to skip debounced watcher during immediate saves
 
 export function useRiverChat() {
   const selectedNode = computed(() => {
@@ -64,6 +65,10 @@ export function useRiverChat() {
   watch(settings, async (newSettings) => {
     if (isInitializing.value) {
       console.log('[useRiverChat] Skipping auto-save during initialization');
+      return;
+    }
+    if (isSavingImmediately.value) {
+      console.log('[useRiverChat] Skipping debounced save - immediate save in progress');
       return;
     }
     // Use debounced save to reduce writes
@@ -458,22 +463,39 @@ export function useRiverChat() {
   }
 
   // Settings Management
-  async function updateSettings(newSettings: Partial<Settings>): Promise<void> {
+  async function updateSettings(newSettings: Partial<Settings>, immediate: boolean = false): Promise<void> {
     console.log('[useRiverChat] updateSettings called with:', {
       hasAPIKeys: !!newSettings.apiKeys?.openrouter,
       apiKeys: newSettings.apiKeys ? {
         openrouter: newSettings.apiKeys.openrouter ? `${newSettings.apiKeys.openrouter.substring(0, 10)}...` : 'empty'
       } : 'no apiKeys property',
+      immediate,
       newSettings
     });
 
-    settings.value = { ...settings.value, ...newSettings };
+    // Set flag to skip debounced watcher if this is an immediate save
+    // Must be set BEFORE updating settings.value to ensure watcher sees it
+    if (immediate) {
+      isSavingImmediately.value = true;
+    }
+
+    // Merge new settings into current settings
+    const mergedSettings = { ...settings.value, ...newSettings };
+    settings.value = mergedSettings;
 
     console.log('[useRiverChat] After merge, settings.value.apiKeys:', {
       openrouter: settings.value.apiKeys.openrouter ? `${settings.value.apiKeys.openrouter.substring(0, 10)}...` : 'empty'
     });
 
-    await FirestoreStorageService.saveSettings(settings.value);
+    // Save immediately (bypasses debounced watcher)
+    await FirestoreStorageService.saveSettings(mergedSettings);
+    
+    // Reset flag after save completes
+    if (immediate) {
+      // Small delay to ensure watcher has processed the skip
+      await new Promise(resolve => setTimeout(resolve, 10));
+      isSavingImmediately.value = false;
+    }
   }
 
   async function updateAPIKeys(apiKeys: APIKeys): Promise<void> {

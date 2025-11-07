@@ -171,52 +171,62 @@
           </div>
         </div>
 
-        <!-- Model Selection Summary -->
-        <div class="mb-3 p-2.5 rounded-lg flex items-center justify-between gap-2" style="background: var(--color-background); border: 1px solid var(--color-border);">
-          <div class="flex-1 min-w-0">
-            <div class="text-[10px] font-bold uppercase tracking-wider mb-1" style="color: var(--color-text-tertiary);">
-              Selected Models ({{ parsedSelectedModels.length }})
-            </div>
-            <div v-if="parsedSelectedModels.length > 0" class="flex flex-wrap gap-1.5">
-              <span
-                v-for="model in parsedSelectedModels"
-                :key="model.id"
-                class="text-[10px] font-medium px-2 py-0.5 rounded-md"
-                style="background: var(--color-primary-muted); color: var(--color-primary); border: 1px solid var(--color-primary);"
-              >
-                {{ model.name }}
-              </span>
-            </div>
-            <div v-else class="text-[10px] font-medium" style="color: var(--color-text-tertiary);">
-              No models selected
-            </div>
-          </div>
-          <button
-            @click="showModelSelectionModal = true"
-            class="btn-material px-3 py-1.5 text-xs font-semibold whitespace-nowrap"
-          >
-            Select
-          </button>
-        </div>
+         <!-- Model Selection Summary -->
+         <div class="mb-2.5 p-2 rounded-lg flex items-center justify-between gap-2" style="background: var(--color-background); border: 1px solid var(--color-border);">
+           <div class="flex-1 min-w-0">
+             <div v-if="parsedSelectedModels.length > 0" class="flex flex-wrap gap-1">
+               <span
+                 v-for="model in parsedSelectedModels"
+                 :key="model.id"
+                 class="text-[10px] font-medium px-1.5 py-0.5 rounded-md"
+                 style="background: var(--color-primary-muted); color: var(--color-primary); border: 1px solid var(--color-primary);"
+               >
+                 {{ model.name }}
+               </span>
+             </div>
+             <div v-else class="text-[10px] font-medium" style="color: var(--color-text-tertiary);">
+               No models selected
+             </div>
+           </div>
+           <button
+             @click="showModelSelectionModal = true"
+             class="flex items-center justify-center p-1.5 rounded-md hover:bg-white/5 transition-colors"
+             style="color: var(--color-text-secondary);"
+             title="Edit model selection"
+           >
+             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+               <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+             </svg>
+           </button>
+         </div>
 
-        <textarea
-          ref="textareaRef"
-          v-model="inputText"
-          class="textarea-material text-[13.5px]"
-          :placeholder="branchContext.text ? 'Ask about the selected text...' : 'Type your message... (Enter to send, Ctrl+Enter for newline)'"
-          rows="3"
-          @keydown="handleKeydown"
-        ></textarea>
+         <div class="flex items-end gap-2">
+           <textarea
+             ref="textareaRef"
+             v-model="inputText"
+             class="textarea-material text-[13.5px] flex-1"
+             :placeholder="branchContext.text ? 'Ask about the selected text...' : 'Type your message...'"
+             rows="1"
+             style="resize: none; min-height: 40px; max-height: 200px;"
+             @input="autoResizeTextarea"
+             @keydown="handleKeydown"
+           ></textarea>
 
-        <div class="flex justify-end gap-2 mt-3">
-          <button
-            @click="handleSend"
-            :disabled="!inputText.trim() || !canSend || selectedModels.length === 0"
-            class="btn-material px-5 py-2.5 font-bold"
-          >
-            Send{{ selectedModels.length > 1 ? ` to ${selectedModels.length} Models` : '' }}
-          </button>
-        </div>
+           <button
+             @click="handleSend"
+             :disabled="!inputText.trim() || !canSend || selectedModels.length === 0"
+             class="flex items-center justify-center rounded-lg transition-all"
+             :style="(!inputText.trim() || !canSend || selectedModels.length === 0) 
+               ? 'width: 40px; height: 40px; background: var(--color-border); cursor: not-allowed;'
+               : 'width: 40px; height: 40px; background: var(--color-primary); cursor: pointer;'"
+             :title="selectedModels.length > 1 ? `Send to ${selectedModels.length} models` : 'Send message'"
+           >
+             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: white;">
+               <path d="M12 19V5M5 12l7-7 7 7"/>
+             </svg>
+           </button>
+         </div>
       </div>
     </div>
 
@@ -444,24 +454,20 @@ watch(
   { immediate: true, flush: 'post' }
 );
 
+function autoResizeTextarea() {
+  const textarea = textareaRef.value;
+  if (textarea) {
+    textarea.style.height = '40px';
+    textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
+  }
+}
+
 function handleKeydown(event: KeyboardEvent) {
   // Handle Enter key
   if (event.key === 'Enter') {
-    // Ctrl+Enter or Cmd+Enter: insert newline
-    if (event.ctrlKey || event.metaKey) {
-      event.preventDefault();
-      // Manually insert newline at cursor position
-      const textarea = textareaRef.value;
-      if (textarea) {
-        const start = textarea.selectionStart;
-        const end = textarea.selectionEnd;
-        const value = inputText.value;
-        inputText.value = value.substring(0, start) + '\n' + value.substring(end);
-        // Restore cursor position after the newline
-        nextTick(() => {
-          textarea.selectionStart = textarea.selectionEnd = start + 1;
-        });
-      }
+    // Shift+Enter: insert newline (like Claude)
+    if (event.shiftKey) {
+      // Allow default behavior (newline)
       return;
     }
     
@@ -492,6 +498,12 @@ function handleSend() {
     }
 
     inputText.value = '';
+    // Reset textarea height after sending
+    nextTick(() => {
+      if (textareaRef.value) {
+        textareaRef.value.style.height = '40px';
+      }
+    });
   }
 }
 

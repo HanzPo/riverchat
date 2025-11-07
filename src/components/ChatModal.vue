@@ -1,136 +1,153 @@
 <template>
-  <div v-if="isOpen" class="modal-backdrop" @click.self="emit('close')">
-    <div class="modal-content modal-chat-large flex flex-col">
-      <!-- Header -->
-      <div class="p-5 border-b border-white/15 card-material flex justify-between items-start gap-4">
-        <div class="flex-1">
-          <h2 class="text-xl font-bold text-white/95">
-            {{ isNewRootMode ? 'New Conversation Thread' : 'Chat History' }}
-          </h2>
-          <p class="text-sm text-white/70 mt-1.5 font-medium">
-            {{ isNewRootMode ? 'Start a new root conversation' : `${path.length} message${path.length !== 1 ? 's' : ''} in this branch` }}
-          </p>
-        </div>
+  <div v-if="isOpen" class="fixed inset-0 flex flex-col" style="background: var(--color-background); z-index: 1000;">
+    <!-- Header -->
+    <div class="flex items-center justify-between px-6 py-4" style="border-bottom: 1px solid var(--color-border); background: var(--color-background-secondary);">
+      <div class="flex items-center gap-4">
         <button
           @click="emit('close')"
-          class="text-white/70 hover:text-white/95 hover:bg-white/10 transition-all p-2 rounded-md"
-          title="Close modal"
+          class="flex items-center gap-2 text-sm font-semibold hover:opacity-80 transition-opacity"
+          style="color: var(--color-text-primary);"
+          title="Back"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
-            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 12H5M12 19l-7-7 7-7"/>
           </svg>
+          Back
         </button>
+        <div v-if="!isNewRootMode" class="h-6 w-px" style="background: var(--color-border);"></div>
+        <div v-if="!isNewRootMode" class="text-sm font-medium" style="color: var(--color-text-tertiary);">
+          {{ path.length }} message{{ path.length !== 1 ? 's' : '' }} in this branch
+        </div>
+      </div>
+      
+      <h1 class="text-lg font-semibold absolute left-1/2 transform -translate-x-1/2" style="color: var(--color-text-primary); letter-spacing: -0.01em;">
+        {{ isNewRootMode ? 'New Conversation' : 'Chat History' }}
+      </h1>
+    </div>
+
+    <!-- Messages -->
+    <div ref="messagesContainer" class="flex-1 overflow-y-auto">
+      <!-- Empty state -->
+      <div v-if="path.length === 0 && !isNewRootMode" class="flex items-center justify-center h-full px-5 py-10">
+        <p class="text-sm text-center font-medium" style="color: var(--color-text-tertiary);">
+          Type a message into the chat to create a new thread
+        </p>
       </div>
 
-      <!-- Messages -->
-      <div ref="messagesContainer" class="flex-1 overflow-y-auto p-6">
-        <div v-if="path.length === 0 && !isNewRootMode" class="flex items-center justify-center h-full px-5 py-10">
-          <p class="text-white/70 text-base text-center font-medium">
-            Type a message into the chat to create a new thread
+      <!-- New root mode welcome -->
+      <div v-if="isNewRootMode" class="flex items-center justify-center h-full px-5 py-10">
+        <div class="text-center">
+          <div class="text-5xl mb-4">🌊</div>
+          <p class="text-xl font-semibold mb-3" style="color: var(--color-text-primary); letter-spacing: -0.01em;">
+            Start a New Thread
+          </p>
+          <p class="text-sm font-medium max-w-md" style="color: var(--color-text-tertiary);">
+            This will create a new root conversation node. Type your message below to begin.
           </p>
         </div>
+      </div>
 
-        <div v-if="isNewRootMode" class="flex items-center justify-center h-full px-5 py-10">
-          <div class="text-center">
-            <div class="text-5xl mb-5">🌊</div>
-            <p class="text-white/90 text-xl font-bold mb-3">
-              Start a New Thread
-            </p>
-            <p class="text-white/70 text-base font-medium">
-              This will create a new root conversation node. Type your message below to begin.
-            </p>
-          </div>
-        </div>
-
-        <div v-else class="flex flex-col gap-4 max-w-4xl mx-auto">
+      <!-- Messages container centered like ChatGPT/Claude -->
+      <div v-else class="max-w-3xl mx-auto py-6 px-4">
+        <div class="flex flex-col gap-6">
           <div
             v-for="message in path"
             :key="message.id"
-            class="p-4 cursor-pointer transition-all duration-200 ease-material rounded-lg card-material hover:-translate-x-1"
-            :class="{
-              'bg-primary/20 border-primary/40': message.type === 'user',
-              'bg-secondary/20 border-secondary/40': message.type === 'ai',
-              'border-2 border-primary shadow-[0_0_0_3px] shadow-primary/30': message.id === selectedNodeId,
-            }"
+            class="cursor-pointer transition-all duration-200 ease-material"
             @click.stop="$emit('node-select', message.id)"
           >
-            <!-- Header -->
-            <div class="flex justify-between items-center mb-3 gap-2">
-              <div class="flex items-center gap-2">
-                <span
-                  class="text-xs font-bold px-3 py-1.5 rounded-md uppercase tracking-wider border flex items-center gap-1.5"
-                  :class="message.type === 'user' ? 'bg-primary/30 border-primary/50 text-primary' : 'bg-secondary/30 border-secondary/50 text-secondary'"
-                >
-                  <User v-if="message.type === 'user'" :size="13" />
-                  <Bot v-else :size="13" />
-                  <span>{{ message.type === 'user' ? 'YOU' : 'AI' }}</span>
-                </span>
-                <span
-                  v-if="getBranchCount(message.id) > 0"
-                  class="text-xs font-bold px-2.5 py-1 rounded-md bg-accent/30 border border-accent/50 text-accent flex items-center gap-1"
-                  :title="`${getBranchCount(message.id)} branch${getBranchCount(message.id) > 1 ? 'es' : ''} from highlighted text`"
-                >
-                  <GitBranch :size="12" />
-                  <span>{{ getBranchCount(message.id) }}</span>
-                </span>
-              </div>
-              <span v-if="message.model" class="text-xs font-medium text-white/75 overflow-hidden text-ellipsis whitespace-nowrap">
-                {{ message.model.name }}
-              </span>
-            </div>
-
-            <!-- Branch Metadata (if this message is a branch) -->
-            <div v-if="message.branchMetadata" class="mb-3 p-3 bg-accent/10 border border-accent/30 rounded-md">
-              <div class="text-xs font-bold text-white/60 uppercase tracking-wider mb-2">Selected Text</div>
-              <div class="text-sm text-white/75 italic font-medium pl-3 border-l-2 border-accent/50">
-                "{{ message.branchMetadata.highlightedText }}"
-              </div>
-            </div>
-
-            <!-- Content -->
+            <!-- Message bubble -->
             <div 
-              class="text-white/95 text-sm leading-relaxed mb-3 break-words markdown-content"
-              @mouseup.stop="handleTextSelection($event, message.id)"
+              class="p-5 rounded-2xl transition-all"
+              :class="{
+                'hover:shadow-md': true,
+                'border-2 border-primary shadow-lg shadow-primary/20': message.id === selectedNodeId,
+              }"
+              :style="message.type === 'user' 
+                ? 'background: var(--color-background-secondary); border: 1px solid var(--color-border);'
+                : 'background: var(--color-background-secondary); border: 1px solid var(--color-border);'"
             >
-              <div v-html="renderMarkdown(message.content || '...')"></div>
-              <span v-if="message.state === 'generating'" class="inline-block animate-blink text-info font-bold">▊</span>
-            </div>
+              <!-- Header -->
+              <div class="flex justify-between items-center mb-3 gap-2">
+                <div class="flex items-center gap-2.5">
+                  <span
+                    class="text-xs font-bold px-2.5 py-1 rounded-md uppercase tracking-wider border flex items-center gap-1.5"
+                    :class="message.type === 'user' ? 'bg-primary/30 border-primary/50 text-primary' : 'bg-secondary/30 border-secondary/50 text-secondary'"
+                  >
+                    <User v-if="message.type === 'user'" :size="13" />
+                    <Bot v-else :size="13" />
+                    <span>{{ message.type === 'user' ? 'YOU' : 'AI' }}</span>
+                  </span>
+                  <span
+                    v-if="getBranchCount(message.id) > 0"
+                    class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-accent/30 border border-accent/50 text-accent flex items-center gap-1"
+                    :title="`${getBranchCount(message.id)} branch${getBranchCount(message.id) > 1 ? 'es' : ''} from highlighted text`"
+                  >
+                    <GitBranch :size="11" />
+                    <span>{{ getBranchCount(message.id) }}</span>
+                  </span>
+                </div>
+                <span v-if="message.model" class="text-xs font-medium overflow-hidden text-ellipsis whitespace-nowrap" style="color: var(--color-text-tertiary);">
+                  {{ message.model.name }}
+                </span>
+              </div>
 
-            <!-- Footer -->
-            <div class="flex justify-between items-center text-xs text-white/70">
-              <span class="font-medium">
-                {{ formatTime(message.timestamp) }}
-              </span>
-              <span v-if="message.state === 'error'" class="text-error font-bold flex items-center gap-1">
-                <AlertTriangle :size="13" />
-                <span>Error</span>
-              </span>
+              <!-- Branch Metadata (if this message is a branch) -->
+              <div v-if="message.branchMetadata" class="mb-3 p-3 bg-accent/10 border border-accent/30 rounded-lg">
+                <div class="text-[10px] font-bold uppercase tracking-wider mb-1.5" style="color: var(--color-text-tertiary);">Selected Text</div>
+                <div class="text-xs italic font-medium pl-2.5 border-l-2 border-accent/50" style="color: var(--color-text-secondary);">
+                  "{{ message.branchMetadata.highlightedText }}"
+                </div>
+              </div>
+
+              <!-- Content -->
+              <div 
+                class="text-sm leading-relaxed mb-3 break-words markdown-content"
+                style="color: var(--color-text-primary);"
+                @mouseup.stop="handleTextSelection($event, message.id)"
+              >
+                <div v-html="renderMarkdown(message.content || '...')"></div>
+                <span v-if="message.state === 'generating'" class="inline-block animate-blink text-info font-bold">▊</span>
+              </div>
+
+              <!-- Footer -->
+              <div class="flex justify-between items-center text-xs" style="color: var(--color-text-tertiary);">
+                <span class="font-medium">
+                  {{ formatTime(message.timestamp) }}
+                </span>
+                <span v-if="message.state === 'error'" class="text-error font-bold flex items-center gap-1">
+                  <AlertTriangle :size="12" />
+                  <span>Error</span>
+                </span>
+              </div>
             </div>
           </div>
         </div>
       </div>
+    </div>
 
-      <!-- Input Area -->
-      <div class="p-6 border-t border-white/15 card-material">
+    <!-- Input Area (centered like ChatGPT/Claude) -->
+    <div class="border-t" style="border-color: var(--color-border); background: var(--color-background);">
+      <div class="max-w-3xl mx-auto px-4 py-4">
         <!-- Hint when user node is selected -->
         <div v-if="!canSend && !isNewRootMode && path.length > 0" class="flex items-center justify-center py-10 px-6">
           <div class="text-center">
             <div class="flex justify-center mb-4">
               <MessageCircle :size="48" :stroke-width="1.5" style="color: var(--color-text-tertiary);" />
             </div>
-            <p class="text-white/90 text-lg font-bold mb-3">
+            <p class="text-base font-bold mb-2" style="color: var(--color-text-primary);">
               Select an AI response to reply
             </p>
-            <p class="text-white/60 text-base font-medium">
+            <p class="text-sm font-medium" style="color: var(--color-text-tertiary);">
               You can only continue the conversation from an AI response
             </p>
           </div>
         </div>
 
         <!-- Normal input area when AI node is selected or in new root mode -->
-        <div v-else class="max-w-4xl mx-auto">
+        <div v-else>
           <!-- Branch Context Display (like Cursor) -->
-          <div v-if="branchContext.text" class="mb-4 p-3.5 bg-accent/10 border border-accent/30 rounded-lg animate-slide-in">
+          <div v-if="branchContext.text" class="mb-4 p-3.5 bg-accent/10 border border-accent/30 rounded-xl animate-slide-in">
             <div class="flex items-start justify-between gap-2 mb-2">
               <div class="flex items-center gap-2">
                 <GitBranch :size="16" class="text-accent" />
@@ -138,61 +155,72 @@
               </div>
               <button
                 @click="clearBranchContext"
-                class="text-white/50 hover:text-white/90 transition-colors text-sm font-bold px-2.5 py-1 hover:bg-white/10 rounded flex items-center"
+                class="transition-colors text-xs font-bold px-2 py-1 rounded-md hover:bg-white/10"
+                style="color: var(--color-text-tertiary);"
                 title="Clear context"
               >
                 <X :size="16" />
               </button>
             </div>
-            <div class="text-sm text-white/75 italic pl-3 border-l-2 border-accent/50 max-h-32 overflow-y-auto">
+            <div class="text-sm italic pl-3 border-l-2 border-accent/50 max-h-24 overflow-y-auto" style="color: var(--color-text-secondary);">
               "{{ branchContext.text }}"
             </div>
           </div>
 
           <!-- Model Selection Summary -->
-          <div class="mb-4 p-3 rounded-lg flex items-center justify-between gap-3" style="background: var(--color-background); border: 1px solid var(--color-border);">
+          <div class="mb-3 p-2.5 rounded-lg flex items-center justify-between gap-2" style="background: var(--color-background-secondary); border: 1px solid var(--color-border);">
             <div class="flex-1 min-w-0">
-              <div class="text-xs font-bold uppercase tracking-wider mb-1.5" style="color: var(--color-text-tertiary);">
-                Selected Models ({{ parsedSelectedModels.length }})
-              </div>
-              <div v-if="parsedSelectedModels.length > 0" class="flex flex-wrap gap-2">
+              <div v-if="parsedSelectedModels.length > 0" class="flex flex-wrap gap-1.5">
                 <span
                   v-for="model in parsedSelectedModels"
                   :key="model.id"
-                  class="text-xs font-medium px-2.5 py-1 rounded-md"
+                  class="text-[11px] font-semibold px-2 py-0.5 rounded-md"
                   style="background: var(--color-primary-muted); color: var(--color-primary); border: 1px solid var(--color-primary);"
                 >
                   {{ model.name }}
                 </span>
               </div>
-              <div v-else class="text-xs font-medium" style="color: var(--color-text-tertiary);">
+              <div v-else class="text-[11px] font-medium" style="color: var(--color-text-tertiary);">
                 No models selected
               </div>
             </div>
             <button
               @click="showModelSelectionModal = true"
-              class="btn-material px-4 py-2 text-sm font-semibold whitespace-nowrap"
+              class="flex items-center justify-center p-2 rounded-md hover:bg-white/5 transition-colors"
+              style="color: var(--color-text-secondary);"
+              title="Edit model selection"
             >
-              Select
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
             </button>
           </div>
 
-          <textarea
-            ref="textareaRef"
-            v-model="inputText"
-            class="textarea-material text-sm"
-            :placeholder="branchContext.text ? 'Ask about the selected text...' : 'Type your message... (Enter to send, Ctrl+Enter for newline)'"
-            rows="4"
-            @keydown="handleKeydown"
-          ></textarea>
+          <div class="flex items-end gap-3">
+            <textarea
+              ref="textareaRef"
+              v-model="inputText"
+              class="textarea-material text-sm flex-1"
+              :placeholder="branchContext.text ? 'Ask about the selected text...' : 'Type your message...'"
+              rows="1"
+              style="resize: none; min-height: 44px; max-height: 200px;"
+              @input="autoResizeTextarea"
+              @keydown="handleKeydown"
+            ></textarea>
 
-          <div class="flex justify-end gap-3 mt-4">
             <button
               @click="handleSend"
               :disabled="!inputText.trim() || !canSend || selectedModels.length === 0"
-              class="btn-material px-6 py-3 font-bold text-base"
+              class="flex items-center justify-center rounded-lg transition-all"
+              :style="(!inputText.trim() || !canSend || selectedModels.length === 0) 
+                ? 'width: 44px; height: 44px; background: var(--color-border); cursor: not-allowed;'
+                : 'width: 44px; height: 44px; background: var(--color-primary); cursor: pointer;'"
+              :title="selectedModels.length > 1 ? `Send to ${selectedModels.length} models` : 'Send message'"
             >
-              Send{{ selectedModels.length > 1 ? ` to ${selectedModels.length} Models` : '' }}
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: white;">
+                <path d="M12 19V5M5 12l7-7 7 7"/>
+              </svg>
             </button>
           </div>
         </div>
@@ -431,24 +459,20 @@ watch(
   { immediate: true }
 );
 
+function autoResizeTextarea() {
+  const textarea = textareaRef.value;
+  if (textarea) {
+    textarea.style.height = '44px';
+    textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
+  }
+}
+
 function handleKeydown(event: KeyboardEvent) {
   // Handle Enter key
   if (event.key === 'Enter') {
-    // Ctrl+Enter or Cmd+Enter: insert newline
-    if (event.ctrlKey || event.metaKey) {
-      event.preventDefault();
-      // Manually insert newline at cursor position
-      const textarea = textareaRef.value;
-      if (textarea) {
-        const start = textarea.selectionStart;
-        const end = textarea.selectionEnd;
-        const value = inputText.value;
-        inputText.value = value.substring(0, start) + '\n' + value.substring(end);
-        // Restore cursor position after the newline
-        nextTick(() => {
-          textarea.selectionStart = textarea.selectionEnd = start + 1;
-        });
-      }
+    // Shift+Enter: insert newline (like Claude)
+    if (event.shiftKey) {
+      // Allow default behavior (newline)
       return;
     }
     
@@ -479,6 +503,12 @@ function handleSend() {
     }
 
     inputText.value = '';
+    // Reset textarea height after sending
+    nextTick(() => {
+      if (textareaRef.value) {
+        textareaRef.value.style.height = '44px';
+      }
+    });
   }
 }
 
@@ -595,14 +625,6 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.modal-chat-large {
-  width: 90vw;
-  max-width: 1400px;
-  height: 85vh;
-  max-height: 900px;
-  padding: 0;
-}
-
 @keyframes blink {
   0%, 50% {
     opacity: 1;
