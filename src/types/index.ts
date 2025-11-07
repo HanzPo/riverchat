@@ -153,9 +153,8 @@ export function getDefaultEnabledModelsRecord(models: LLMModel[]): Record<string
   
   // Preferred default models to enable
   const defaultModelIds = [
-    'google/gemma-3n-e4b-it:free',
-    'mistralai/mistral-7b-instruct:free',
-    'moonshotai/kimi-k2:free',
+    'google/gemma-3-27b-it:free',
+    'meta-llama/llama-3.3-70b-instruct:free',
     'openai/gpt-oss-20b:free',
   ];
   
@@ -213,7 +212,7 @@ export const SUBSCRIPTION_TIERS: Record<SubscriptionTier, SubscriptionInfo> = {
     tier: 'free',
     monthlyCredits: 0,
     price: 0,
-    features: ['Access to Gemini 2.0 Flash', 'Limited usage', 'Bring your own API keys'],
+    features: ['Access to Free OpenRouter Models', 'Limited usage', 'Bring your own API keys'],
   },
   basic: {
     tier: 'basic',
