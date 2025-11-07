@@ -448,6 +448,7 @@ onMounted(async () => {
 async function handleAuthenticated() {
   // User just logged in/registered
   isAuthenticating.value = true;
+  showAuth.value = false; // Close the auth modal
 
   try {
     // Reload data from Firestore with force refresh
