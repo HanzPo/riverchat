@@ -42,15 +42,6 @@
     <div class="flex-1 flex flex-col overflow-hidden">
       <!-- API Keys Tab -->
       <div v-if="activeTab === 'api-keys'" class="flex-1 flex flex-col overflow-hidden">
-        <div class="px-8 py-4 border-b flex items-center gap-3" style="border-color: var(--color-border);">
-          <h1 class="text-lg font-bold" style="color: var(--color-text-primary);">
-            API Key
-          </h1>
-          <p class="text-sm" style="color: var(--color-text-secondary);">
-            Configure your OpenRouter API key to access AI models
-          </p>
-        </div>
-
         <div class="flex-1 overflow-y-auto p-8">
           <div class="max-w-2xl">
             <div class="mb-6">
@@ -109,16 +100,6 @@
 
       <!-- Enabled Models Tab -->
       <div v-if="activeTab === 'enabled-models'" class="flex-1 flex flex-col overflow-hidden">
-        <div class="px-8 py-4 border-b flex items-center gap-3" style="border-color: var(--color-border);">
-          <h1 class="text-lg font-bold" style="color: var(--color-text-primary);">
-            Enabled Models
-          </h1>
-          <p class="text-sm" style="color: var(--color-text-secondary);">
-            Select which models appear in the chat interface
-            <span v-if="isUsingSharedKey" class="text-warning font-semibold"> (Free models only)</span>
-          </p>
-        </div>
-
         <div class="flex-1 overflow-y-auto p-8">
           <!-- Filters -->
           <div class="mb-6 rounded-lg" style="background: var(--color-background); border: 1px solid var(--color-border);">
@@ -326,15 +307,6 @@
 
       <!-- Data Tab -->
       <div v-if="activeTab === 'data'" class="flex-1 flex flex-col overflow-hidden">
-        <div class="px-8 py-4 border-b flex items-center gap-3" style="border-color: var(--color-border);">
-          <h1 class="text-lg font-bold" style="color: var(--color-text-primary);">
-            Data Management
-          </h1>
-          <p class="text-sm" style="color: var(--color-text-secondary);">
-            Manage your cached data and refresh model information
-          </p>
-        </div>
-
         <div class="flex-1 overflow-y-auto p-8">
           <div class="max-w-2xl">
             <!-- Model List Section -->
@@ -405,15 +377,6 @@
 
       <!-- Account Tab -->
       <div v-if="activeTab === 'account'" class="flex-1 flex flex-col overflow-hidden">
-        <div class="px-8 py-4 border-b flex items-center gap-3" style="border-color: var(--color-border);">
-          <h1 class="text-lg font-bold" style="color: var(--color-text-primary);">
-            Account
-          </h1>
-          <p class="text-sm" style="color: var(--color-text-secondary);">
-            Manage your account and authentication
-          </p>
-        </div>
-
         <div class="flex-1 overflow-y-auto p-8">
           <div class="max-w-2xl">
             <!-- Account Info Section -->

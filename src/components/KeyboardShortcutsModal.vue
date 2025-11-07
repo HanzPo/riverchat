@@ -234,7 +234,7 @@ const ctrlKey = computed(() => {
   background: var(--color-background-elevated);
   backdrop-filter: blur(10px);
   border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: 8px;
   max-width: 1100px;
   width: 90%;
   max-height: 85vh;
@@ -281,7 +281,7 @@ const ctrlKey = computed(() => {
   font-size: 20px;
   cursor: pointer;
   padding: 8px 12px;
-  border-radius: 6px;
+  border-radius: 8px;
   transition: all 0.15s var(--ease-in-out);
 }
 
@@ -335,7 +335,7 @@ const ctrlKey = computed(() => {
   align-items: center;
   gap: 16px;
   padding: 8px;
-  border-radius: 6px;
+  border-radius: 8px;
   transition: background 0.15s var(--ease-in-out);
 }
 
@@ -390,7 +390,7 @@ kbd {
   padding: 12px;
   background: var(--color-primary-muted);
   border-left: 3px solid var(--color-primary);
-  border-radius: 6px;
+  border-radius: 8px;
 }
 
 .tip-item strong {

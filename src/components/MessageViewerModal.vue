@@ -6,7 +6,7 @@
         <div>
           <div class="flex items-center gap-2.5 mb-2.5">
             <span
-              class="px-2.5 py-1 rounded text-[10px] font-semibold uppercase tracking-wide"
+              class="px-2.5 py-1 rounded-md text-[10px] font-semibold uppercase tracking-wide"
               :style="message.type === 'user' 
                 ? 'background: var(--color-primary-muted); color: var(--color-primary); border: 1px solid var(--color-primary);' 
                 : 'background: var(--color-accent); opacity: 0.2; color: var(--color-accent); border: 1px solid var(--color-accent);'"
@@ -143,7 +143,7 @@ function handleCopy() {
 .markdown-content :deep(pre) {
   background: var(--color-background);
   padding: 0.75em;
-  border-radius: 6px;
+  border-radius: 8px;
   overflow-x: auto;
   margin: 0.75em 0;
   border: 1px solid var(--color-border);

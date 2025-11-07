@@ -66,7 +66,7 @@ defineEmits<Emits>();
   padding: 8px 12px;
   background: var(--color-primary-muted);
   border: 1px solid var(--color-primary);
-  border-radius: 6px;
+  border-radius: 8px;
   color: var(--color-primary);
   font-size: 13px;
   font-weight: 600;

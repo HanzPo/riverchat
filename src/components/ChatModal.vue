@@ -60,7 +60,7 @@
           >
             <!-- Message bubble -->
             <div 
-              class="p-5 rounded-2xl transition-all"
+              class="p-5 rounded-lg transition-all"
               :class="{
                 'hover:shadow-md': true,
                 'border-2 border-primary shadow-lg shadow-primary/20': message.id === selectedNodeId,
@@ -149,7 +149,7 @@
         <!-- Normal input area when AI node is selected or in new root mode -->
         <div v-else>
           <!-- Branch Context Display (like Cursor) -->
-          <div v-if="branchContext.text" class="mb-4 p-3.5 bg-accent/10 border border-accent/30 rounded-xl animate-slide-in">
+          <div v-if="branchContext.text" class="mb-4 p-3.5 bg-accent/10 border border-accent/30 rounded-lg animate-slide-in">
             <div class="flex items-start justify-between gap-2 mb-2">
               <div class="flex items-center gap-2">
                 <GitBranch :size="16" class="text-accent" />
@@ -177,7 +177,7 @@
                 <span
                   v-for="model in parsedSelectedModels"
                   :key="model.id"
-                  class="text-[9px] font-semibold px-1.5 py-0.5 rounded"
+                  class="text-[9px] font-semibold px-1.5 py-0.5 rounded-md"
                   style="background: var(--color-primary-muted); color: var(--color-primary);"
                 >
                   {{ model.name }}
@@ -678,7 +678,7 @@ onUnmounted(() => {
 .markdown-content :deep(pre) {
   background-color: rgba(0, 0, 0, 0.3);
   padding: 0.75em;
-  border-radius: 6px;
+  border-radius: 8px;
   overflow-x: auto;
   margin: 0.75em 0;
   border: 1px solid rgba(255, 255, 255, 0.1);

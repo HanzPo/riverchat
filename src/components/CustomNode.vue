@@ -15,7 +15,7 @@
     <!-- Header -->
     <div class="flex justify-between items-center mb-3 gap-2">
       <span
-        class="text-[10px] font-semibold px-2.5 py-1 rounded uppercase tracking-wide flex items-center gap-1.5"
+        class="text-[10px] font-semibold px-2.5 py-1 rounded-md uppercase tracking-wide flex items-center gap-1.5"
         :style="data.type === 'user'
           ? 'background: var(--color-primary-muted); color: var(--color-primary); border: 1px solid var(--color-primary);'
           : 'background: rgba(162, 89, 255, 0.1); color: var(--color-accent); border: 1px solid var(--color-accent);'"
@@ -30,7 +30,7 @@
     </div>
 
     <!-- Branch Metadata Badge -->
-    <div v-if="data.branchMetadata" class="mb-2.5 p-2 rounded-md" style="background: rgba(162, 89, 255, 0.1); border: 1px solid rgba(162, 89, 255, 0.3);">
+    <div v-if="data.branchMetadata" class="mb-2.5 p-2 rounded-lg" style="background: rgba(162, 89, 255, 0.1); border: 1px solid rgba(162, 89, 255, 0.3);">
       <div class="text-[8px] font-semibold uppercase tracking-wider mb-1" style="color: var(--color-text-tertiary);">Selected Text</div>
       <div class="text-[9px] italic line-clamp-2" style="color: var(--color-text-secondary);">
         "{{ data.branchMetadata.highlightedText }}"
@@ -44,7 +44,7 @@
     </div>
 
     <!-- Error Badge -->
-    <div v-if="data.state === 'error'" class="px-2.5 py-1.5 rounded text-xs font-semibold mb-2 text-center flex items-center justify-center gap-1.5" style="background: var(--color-error-bg); color: var(--color-error); border: 1px solid var(--color-error);">
+    <div v-if="data.state === 'error'" class="px-2.5 py-1.5 rounded-md text-xs font-semibold mb-2 text-center flex items-center justify-center gap-1.5" style="background: var(--color-error-bg); color: var(--color-error); border: 1px solid var(--color-error);">
       <AlertTriangle :size="12" />
       <span>Error</span>
     </div>

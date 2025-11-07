@@ -7,7 +7,7 @@
         <h1 class="text-sm font-semibold" style="color: var(--color-text-primary); letter-spacing: -0.01em;">
           🌊 RiverChat
         </h1>
-        <span v-if="currentRiver" class="text-xs font-medium px-2 py-0.5 rounded" style="color: var(--color-text-secondary); background: var(--color-background); border: 1px solid var(--color-border);">
+        <span v-if="currentRiver" class="text-xs font-medium px-2 py-0.5 rounded-md" style="color: var(--color-text-secondary); background: var(--color-background); border: 1px solid var(--color-border);">
           {{ currentRiver.name }}
         </span>
       </div>

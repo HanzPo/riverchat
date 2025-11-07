@@ -72,7 +72,7 @@
         <div
           v-for="message in path"
           :key="message.id"
-          class="p-3.5 cursor-pointer transition-all duration-200 ease-material rounded-lg card-material hover:-translate-x-1"
+          class="p-4 cursor-pointer transition-all duration-200 ease-material rounded-lg card-material hover:-translate-x-1"
           :class="{
             'bg-primary/20 border-primary/40': message.type === 'user',
             'bg-secondary/20 border-secondary/40': message.type === 'ai',
@@ -106,7 +106,7 @@
           </div>
 
           <!-- Branch Metadata (if this message is a branch) -->
-          <div v-if="message.branchMetadata" class="mb-2.5 p-2.5 bg-accent/10 border border-accent/30 rounded-md">
+          <div v-if="message.branchMetadata" class="mb-2.5 p-2.5 bg-accent/10 border border-accent/30 rounded-lg">
             <div class="text-[10px] font-bold text-white/60 uppercase tracking-wider mb-1.5">Selected Text</div>
             <div class="text-[12px] text-white/75 italic font-medium pl-2 border-l-2 border-accent/50">
               "{{ message.branchMetadata.highlightedText }}"
@@ -675,7 +675,7 @@ onUnmounted(() => {
 .markdown-content :deep(pre) {
   background-color: rgba(0, 0, 0, 0.3);
   padding: 0.75em;
-  border-radius: 6px;
+  border-radius: 8px;
   overflow-x: auto;
   margin: 0.75em 0;
   border: 1px solid rgba(255, 255, 255, 0.1);
