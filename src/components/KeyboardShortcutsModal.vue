@@ -37,14 +37,6 @@
               </div>
               <div class="shortcut-item">
                 <div class="shortcut-keys">
-                  <kbd>{{ ctrlKey }}</kbd>
-                  <span>+</span>
-                  <kbd>F</kbd>
-                </div>
-                <div class="shortcut-description">Search</div>
-              </div>
-              <div class="shortcut-item">
-                <div class="shortcut-keys">
                   <kbd>Esc</kbd>
                 </div>
                 <div class="shortcut-description">Close modal/panel</div>
@@ -146,52 +138,6 @@
             </div>
           </div>
 
-          <!-- Graph Controls -->
-          <div class="shortcuts-section">
-            <h3 class="section-title">Graph Controls</h3>
-            <div class="shortcuts-list">
-              <div class="shortcut-item">
-                <div class="shortcut-keys">
-                  <kbd>{{ ctrlKey }}</kbd>
-                  <span>+</span>
-                  <kbd>+</kbd>
-                </div>
-                <div class="shortcut-description">Zoom in</div>
-              </div>
-              <div class="shortcut-item">
-                <div class="shortcut-keys">
-                  <kbd>{{ ctrlKey }}</kbd>
-                  <span>+</span>
-                  <kbd>-</kbd>
-                </div>
-                <div class="shortcut-description">Zoom out</div>
-              </div>
-              <div class="shortcut-item">
-                <div class="shortcut-keys">
-                  <kbd>{{ ctrlKey }}</kbd>
-                  <span>+</span>
-                  <kbd>0</kbd>
-                </div>
-                <div class="shortcut-description">Reset zoom</div>
-              </div>
-              <div class="shortcut-item">
-                <div class="shortcut-keys">
-                  <kbd>{{ ctrlKey }}</kbd>
-                  <span>+</span>
-                  <kbd>A</kbd>
-                </div>
-                <div class="shortcut-description">Select all nodes</div>
-              </div>
-              <div class="shortcut-item">
-                <div class="shortcut-keys">
-                  <kbd>Space</kbd>
-                  <span>+</span>
-                  <kbd>Drag</kbd>
-                </div>
-                <div class="shortcut-description">Pan canvas</div>
-              </div>
-            </div>
-          </div>
 
           <!-- Panel Controls -->
           <div class="shortcuts-section">
@@ -212,14 +158,6 @@
                   <kbd>]</kbd>
                 </div>
                 <div class="shortcut-description">Toggle chat panel</div>
-              </div>
-              <div class="shortcut-item">
-                <div class="shortcut-keys">
-                  <kbd>{{ ctrlKey }}</kbd>
-                  <span>+</span>
-                  <kbd>M</kbd>
-                </div>
-                <div class="shortcut-description">Toggle minimap</div>
               </div>
             </div>
           </div>
