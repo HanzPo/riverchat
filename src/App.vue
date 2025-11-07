@@ -233,7 +233,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useRiverChat } from './composables/useRiverChat';
 import type { MessageNode, LLMModel } from './types';
 import { Folder, Search, HelpCircle, Settings, Plus, User as UserIcon } from 'lucide-vue-next';
@@ -332,6 +332,15 @@ const currentPath = computed(() => {
   if (!selectedNodeId.value) return [];
   return getPathToNode(selectedNodeId.value);
 });
+
+// Update page title when river changes
+watch(currentRiver, (river) => {
+  if (river) {
+    document.title = `RiverChat - ${river.name}`;
+  } else {
+    document.title = 'RiverChat | Branching AI Conversations';
+  }
+}, { immediate: true });
 
 // Resize functionality
 function startResize(e: MouseEvent) {
