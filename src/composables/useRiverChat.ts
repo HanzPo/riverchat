@@ -1,7 +1,7 @@
 import { ref, computed, watch } from 'vue';
 import { v4 as uuidv4 } from 'uuid';
 import type { River, MessageNode, LLMModel, Settings, APIKeys } from '../types';
-import { getDefaultEnabledModelsRecord, validateSelectedModels, SHARED_OPENROUTER_API_KEY } from '../types';
+import { getDefaultEnabledModelsRecord, SHARED_OPENROUTER_API_KEY } from '../types';
 import { FirestoreStorageService } from '../services/firestore-storage';
 import { LLMAPIService } from '../services/llm-api';
 import { getAvailableModels, filterModelsByApiKey, sortModels } from '../services/openrouter';
@@ -528,75 +528,31 @@ export function useRiverChat() {
       // Check API keys
       hasAPIKeys.value = await FirestoreStorageService.hasAPIKeys();
 
-      // Use cached models immediately if available
-      if (!forceRefresh && settings.value.availableModels && settings.value.availableModels.length > 0) {
+      // Use cached models if available, fetch only on first initialization
+      if (settings.value.availableModels && settings.value.availableModels.length > 0) {
         console.log(`[useRiverChat] Using ${settings.value.availableModels.length} cached models`);
-        isLoading.value = false;
-        isInitializing.value = false;
-        
-        // Fetch rivers after showing cached settings
-        await refreshRivers();
-        
-        // Load the most recent river if available
-        if (allRivers.value && allRivers.value.length > 0 && allRivers.value[0]) {
-          await loadRiver(allRivers.value[0].id);
-        }
-        
-        // Fetch fresh models in background (non-blocking)
-        fetchModelsInBackground();
-        return;
-      }
+      } else {
+        // First time user - fetch models once
+        console.log('[useRiverChat] No cached models found. Fetching models for first-time initialization...');
+        try {
+          const allModels = await getAvailableModels();
+          const apiKey = settings.value.apiKeys.openrouter || SHARED_OPENROUTER_API_KEY;
+          const filteredModels = filterModelsByApiKey(allModels, apiKey);
+          const sortedModels = sortModels(filteredModels);
 
-      // Fetch available models from OpenRouter (if no cache or force refresh)
-      console.log('[useRiverChat] Fetching models from OpenRouter...');
-      try {
-        const allModels = await getAvailableModels();
-        const apiKey = settings.value.apiKeys.openrouter || SHARED_OPENROUTER_API_KEY;
+          settings.value.availableModels = sortedModels;
+          settings.value.lastModelRefresh = Date.now();
 
-        // Filter models based on API key (free models only for shared key)
-        const filteredModels = filterModelsByApiKey(allModels, apiKey);
-        const sortedModels = sortModels(filteredModels);
+          // Enable default models
+          if (!settings.value.enabledModels || Object.keys(settings.value.enabledModels).length === 0) {
+            settings.value.enabledModels = getDefaultEnabledModelsRecord(sortedModels);
+          }
 
-        // Update available models in settings
-        settings.value.availableModels = sortedModels;
-        console.log(`[useRiverChat] Loaded ${sortedModels.length} models (${apiKey === SHARED_OPENROUTER_API_KEY ? 'free only' : 'all'})`);
-
-        // If no models are enabled, enable default models
-        if (!settings.value.enabledModels || Object.keys(settings.value.enabledModels).length === 0) {
-          settings.value.enabledModels = getDefaultEnabledModelsRecord(sortedModels);
-          console.log('[useRiverChat] Initialized default enabled models');
-        } else {
-          // Clean up enabled models - remove any that are no longer available
-          const availableModelIds = new Set(sortedModels.map(m => m.id));
-          const cleanedEnabledModels: Record<string, boolean> = {};
-          Object.keys(settings.value.enabledModels).forEach(modelId => {
-            if (availableModelIds.has(modelId) && settings.value.enabledModels![modelId]) {
-              cleanedEnabledModels[modelId] = true;
-            }
-          });
-          settings.value.enabledModels = cleanedEnabledModels;
-        }
-
-        // Validate and clean up lastChatSelectedModels based on available and enabled models
-        if (settings.value.lastChatSelectedModels && settings.value.lastChatSelectedModels.length > 0) {
-          const validatedModels = validateSelectedModels(
-            settings.value.lastChatSelectedModels,
-            sortedModels,
-            settings.value.enabledModels
-          );
-          settings.value.lastChatSelectedModels = validatedModels;
-          console.log(`[useRiverChat] Validated chat selected models: ${validatedModels.length} valid models`);
-        }
-
-        // Save updated settings (this will save availableModels to storage)
-        await FirestoreStorageService.saveSettings(settings.value);
-      } catch (error) {
-        console.error('[useRiverChat] Failed to fetch models from OpenRouter:', error);
-        // Use cached models if available
-        if (settings.value.availableModels && settings.value.availableModels.length > 0) {
-          console.log('[useRiverChat] Using cached models');
-        } else {
-          console.error('[useRiverChat] No cached models available');
+          await FirestoreStorageService.saveSettings(settings.value);
+          console.log(`[useRiverChat] Fetched and cached ${sortedModels.length} models for first-time use`);
+        } catch (error) {
+          console.error('[useRiverChat] Failed to fetch models:', error);
+          console.log('[useRiverChat] Please refresh model list from Settings > Data.');
         }
       }
 
@@ -614,39 +570,6 @@ export function useRiverChat() {
       // Enable auto-save after initialization complete
       isInitializing.value = false;
       console.log('[useRiverChat] Initialization complete, auto-save enabled');
-    }
-  }
-
-  // Background model fetching (non-blocking)
-  async function fetchModelsInBackground(): Promise<void> {
-    try {
-      console.log('[useRiverChat] Fetching fresh models in background...');
-      const allModels = await getAvailableModels();
-      const apiKey = settings.value.apiKeys.openrouter || SHARED_OPENROUTER_API_KEY;
-
-      const filteredModels = filterModelsByApiKey(allModels, apiKey);
-      const sortedModels = sortModels(filteredModels);
-
-      // Only update if models have changed
-      if (JSON.stringify(sortedModels) !== JSON.stringify(settings.value.availableModels)) {
-        console.log('[useRiverChat] Models updated in background');
-        settings.value.availableModels = sortedModels;
-        
-        // Clean up enabled models
-        const availableModelIds = new Set(sortedModels.map(m => m.id));
-        const cleanedEnabledModels: Record<string, boolean> = {};
-        Object.keys(settings.value.enabledModels || {}).forEach(modelId => {
-          if (availableModelIds.has(modelId) && settings.value.enabledModels![modelId]) {
-            cleanedEnabledModels[modelId] = true;
-          }
-        });
-        settings.value.enabledModels = cleanedEnabledModels;
-        
-        // Save to storage (will be debounced)
-        await FirestoreStorageService.saveSettings(settings.value);
-      }
-    } catch (error) {
-      console.error('[useRiverChat] Background model fetch failed:', error);
     }
   }
 

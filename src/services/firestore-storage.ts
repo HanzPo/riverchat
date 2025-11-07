@@ -24,6 +24,7 @@ const DEFAULT_SETTINGS: Settings = {
   enabledModels: {},
   lastChatSelectedModels: [],
   availableModels: [],
+  lastModelRefresh: undefined,
 };
 
 /**

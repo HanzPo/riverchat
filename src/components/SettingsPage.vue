@@ -42,8 +42,8 @@
     <div class="flex-1 flex flex-col overflow-hidden">
       <!-- API Keys Tab -->
       <div v-if="activeTab === 'api-keys'" class="flex-1 flex flex-col overflow-hidden">
-        <div class="p-8 border-b" style="border-color: var(--color-border);">
-          <h1 class="text-2xl font-bold mb-2" style="color: var(--color-text-primary);">
+        <div class="px-8 py-4 border-b flex items-center gap-3" style="border-color: var(--color-border);">
+          <h1 class="text-lg font-bold" style="color: var(--color-text-primary);">
             API Key
           </h1>
           <p class="text-sm" style="color: var(--color-text-secondary);">
@@ -109,8 +109,8 @@
 
       <!-- Enabled Models Tab -->
       <div v-if="activeTab === 'enabled-models'" class="flex-1 flex flex-col overflow-hidden">
-        <div class="p-8 border-b" style="border-color: var(--color-border);">
-          <h1 class="text-2xl font-bold mb-2" style="color: var(--color-text-primary);">
+        <div class="px-8 py-4 border-b flex items-center gap-3" style="border-color: var(--color-border);">
+          <h1 class="text-lg font-bold" style="color: var(--color-text-primary);">
             Enabled Models
           </h1>
           <p class="text-sm" style="color: var(--color-text-secondary);">
@@ -323,6 +323,160 @@
           </button>
         </div>
       </div>
+
+      <!-- Data Tab -->
+      <div v-if="activeTab === 'data'" class="flex-1 flex flex-col overflow-hidden">
+        <div class="px-8 py-4 border-b flex items-center gap-3" style="border-color: var(--color-border);">
+          <h1 class="text-lg font-bold" style="color: var(--color-text-primary);">
+            Data Management
+          </h1>
+          <p class="text-sm" style="color: var(--color-text-secondary);">
+            Manage your cached data and refresh model information
+          </p>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-8">
+          <div class="max-w-2xl">
+            <!-- Model List Section -->
+            <div class="mb-8">
+              <h2 class="text-lg font-bold mb-4" style="color: var(--color-text-primary);">
+                Model List
+              </h2>
+              
+              <!-- Last Refresh Info -->
+              <div class="rounded-lg p-4 mb-4" style="background: var(--color-background-secondary); border: 1px solid var(--color-border);">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="text-sm font-semibold" style="color: var(--color-text-secondary);">Last Refreshed</span>
+                  <span class="text-sm font-mono" style="color: var(--color-text-primary);">
+                    {{ formatLastRefresh() }}
+                  </span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span class="text-sm font-semibold" style="color: var(--color-text-secondary);">Available Models</span>
+                  <span class="text-sm font-bold" style="color: var(--color-primary);">
+                    {{ availableModels.length }}
+                  </span>
+                </div>
+              </div>
+
+              <!-- Refresh Button -->
+              <button
+                @click="handleRefreshModels"
+                :disabled="isRefreshingModels"
+                class="btn-material px-6 py-3 font-semibold w-full flex items-center justify-center gap-2"
+                :style="isRefreshingModels ? 'opacity: 0.6; cursor: not-allowed;' : 'background: var(--color-primary-muted); color: var(--color-primary); border-color: var(--color-primary);'"
+              >
+                <svg 
+                  v-if="!isRefreshingModels"
+                  width="18" 
+                  height="18" 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  stroke-width="2"
+                >
+                  <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+                </svg>
+                <svg 
+                  v-if="isRefreshingModels"
+                  class="animate-spin"
+                  width="18" 
+                  height="18" 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  stroke-width="2"
+                >
+                  <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                </svg>
+                {{ isRefreshingModels ? 'Refreshing Models...' : 'Refresh Model List' }}
+              </button>
+
+              <!-- Info Notice -->
+              <div class="rounded-lg p-4 mt-4" style="background: var(--color-info-bg); border: 1px solid var(--color-info);">
+                <p class="text-xs leading-relaxed font-medium" style="color: var(--color-text-primary);">
+                  💡 The model list is cached to improve performance. Click the refresh button to fetch the latest models from OpenRouter.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Account Tab -->
+      <div v-if="activeTab === 'account'" class="flex-1 flex flex-col overflow-hidden">
+        <div class="px-8 py-4 border-b flex items-center gap-3" style="border-color: var(--color-border);">
+          <h1 class="text-lg font-bold" style="color: var(--color-text-primary);">
+            Account
+          </h1>
+          <p class="text-sm" style="color: var(--color-text-secondary);">
+            Manage your account and authentication
+          </p>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-8">
+          <div class="max-w-2xl">
+            <!-- Account Info Section -->
+            <div v-if="currentUser" class="mb-8">
+              <h2 class="text-lg font-bold mb-4" style="color: var(--color-text-primary);">
+                Account Information
+              </h2>
+              
+              <div class="rounded-lg p-4 mb-4" style="background: var(--color-background-secondary); border: 1px solid var(--color-border);">
+                <div class="flex items-center justify-between mb-3">
+                  <span class="text-sm font-semibold" style="color: var(--color-text-tertiary);">Email</span>
+                  <span class="text-sm font-medium" style="color: var(--color-text-primary);">
+                    {{ currentUser.email || 'Not available' }}
+                  </span>
+                </div>
+                <div v-if="currentUser.displayName" class="flex items-center justify-between">
+                  <span class="text-sm font-semibold" style="color: var(--color-text-tertiary);">Display Name</span>
+                  <span class="text-sm font-medium" style="color: var(--color-text-primary);">
+                    {{ currentUser.displayName }}
+                  </span>
+                </div>
+              </div>
+
+              <div class="rounded-lg p-4 mb-6" style="background: var(--color-success-bg); border: 1px solid rgba(34, 197, 94, 0.3);">
+                <p class="text-xs leading-relaxed font-medium" style="color: var(--color-text-primary);">
+                  ✅ You are signed in. Your data is securely synced to the cloud.
+                </p>
+              </div>
+
+              <!-- Sign Out Button -->
+              <button
+                @click="emit('logout')"
+                :disabled="isAuthenticating"
+                class="btn-material px-6 py-3 font-semibold w-full flex items-center justify-center gap-2"
+                :style="isAuthenticating ? 'opacity: 0.6; cursor: not-allowed;' : 'background: var(--color-error); border-color: var(--color-error);'"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                  <polyline points="16 17 21 12 16 7"/>
+                  <line x1="21" y1="12" x2="9" y2="12"/>
+                </svg>
+                {{ isAuthenticating ? 'Signing out...' : 'Sign Out' }}
+              </button>
+            </div>
+
+            <!-- Not Signed In -->
+            <div v-else class="mb-8">
+              <div class="rounded-lg p-6 text-center" style="background: var(--color-background-secondary); border: 1px solid var(--color-border);">
+                <svg class="mx-auto mb-4" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--color-text-tertiary);">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                  <circle cx="12" cy="7" r="4"/>
+                </svg>
+                <p class="text-sm font-medium mb-2" style="color: var(--color-text-primary);">
+                  Not signed in
+                </p>
+                <p class="text-xs" style="color: var(--color-text-tertiary);">
+                  Sign in to sync your data across devices
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Model Details Modal -->
@@ -433,22 +587,27 @@ import { getAvailableModels, filterModelsByApiKey, sortModels } from '../service
 
 interface Props {
   settings: Settings;
+  currentUser?: { uid: string; email: string | null; displayName: string | null } | null;
+  isAuthenticating?: boolean;
 }
 
 interface Emits {
   (e: 'save', settings: Settings): void;
   (e: 'close'): void;
+  (e: 'logout'): void;
 }
 
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
-const tabs: Array<{ id: 'api-keys' | 'enabled-models'; name: string }> = [
+const tabs: Array<{ id: 'api-keys' | 'enabled-models' | 'data' | 'account'; name: string }> = [
   { id: 'enabled-models', name: 'Enabled Models' },
   { id: 'api-keys', name: 'API Key' },
+  { id: 'data', name: 'Data' },
+  { id: 'account', name: 'Account' },
 ];
 
-const activeTab = ref<'api-keys' | 'enabled-models'>('enabled-models');
+const activeTab = ref<'api-keys' | 'enabled-models' | 'data' | 'account'>('enabled-models');
 
 // API Key state
 const localApiKey = ref(props.settings.apiKeys.openrouter || '');
@@ -475,6 +634,9 @@ const modelDetailsModal = ref<{
   isOpen: false,
   model: null,
 });
+
+// Data tab state
+const isRefreshingModels = ref(false);
 
 // Compute ranges from available models
 // Not needed anymore - using fixed ranges
@@ -550,58 +712,52 @@ const filteredModels = computed(() => {
 
 // Not needed anymore - using fixed ranges
 
-// Watch for API key changes and update available models
-async function handleApiKeyChange() {
-  try {
-    const allModels = await getAvailableModels();
-    const apiKey = localApiKey.value || SHARED_OPENROUTER_API_KEY;
-    const filtered = filterModelsByApiKey(allModels, apiKey);
-    const sorted = sortModels(filtered);
-    
-    // Force reactive update by creating a new array
-    availableModels.value = [...sorted];
+// Filter available models based on API key changes
+function handleApiKeyChange() {
+  const apiKey = localApiKey.value || SHARED_OPENROUTER_API_KEY;
+  const filtered = filterModelsByApiKey(availableModels.value, apiKey);
+  
+  // Update available models to reflect filter
+  availableModels.value = [...filtered];
 
-    // Clean up enabled models - remove any that are no longer available
-    const availableIds = new Set(sorted.map(m => m.id));
-    const cleaned: Record<string, boolean> = {};
-    Object.keys(localEnabledModels.value).forEach(id => {
-      if (availableIds.has(id) && localEnabledModels.value[id]) {
-        cleaned[id] = true;
+  // Clean up enabled models - remove any that are no longer available
+  const availableIds = new Set(filtered.map(m => m.id));
+  const cleaned: Record<string, boolean> = {};
+  Object.keys(localEnabledModels.value).forEach(id => {
+    if (availableIds.has(id) && localEnabledModels.value[id]) {
+      cleaned[id] = true;
+    }
+  });
+  
+  // If no models are enabled after cleaning, enable default models
+  if (Object.keys(cleaned).length === 0 && filtered.length > 0) {
+    // Try to enable the preferred default models
+    const defaultModelIds = [
+      'google/gemma-3n-e4b-it:free',
+      'mistralai/mistral-7b-instruct:free',
+      'moonshotai/kimi-k2:free',
+      'openai/gpt-oss-20b:free',
+    ];
+    
+    let enabledCount = 0;
+    defaultModelIds.forEach(modelId => {
+      const model = filtered.find(m => m.id === modelId);
+      if (model) {
+        cleaned[model.id] = true;
+        enabledCount++;
       }
     });
     
-    // If no models are enabled after cleaning, enable default models
-    if (Object.keys(cleaned).length === 0 && sorted.length > 0) {
-      // Try to enable the preferred default models
-      const defaultModelIds = [
-        'google/gemma-3n-e4b-it:free',
-        'mistralai/mistral-7b-instruct:free',
-        'moonshotai/kimi-k2:free',
-        'openai/gpt-oss-20b:free',
-      ];
-      
-      let enabledCount = 0;
-      defaultModelIds.forEach(modelId => {
-        const model = sorted.find(m => m.id === modelId);
-        if (model) {
-          cleaned[model.id] = true;
-          enabledCount++;
-        }
-      });
-      
-      // Fallback: if none of the preferred models are available, enable first free model
-      if (enabledCount === 0) {
-        const defaultModel = sorted.find(m => m.isFree) || sorted[0];
-        if (defaultModel) {
-          cleaned[defaultModel.id] = true;
-        }
+    // Fallback: if none of the preferred models are available, enable first free model
+    if (enabledCount === 0) {
+      const defaultModel = filtered.find(m => m.isFree) || filtered[0];
+      if (defaultModel) {
+        cleaned[defaultModel.id] = true;
       }
     }
-    
-    localEnabledModels.value = cleaned;
-  } catch (error) {
-    console.error('Failed to fetch models:', error);
   }
+  
+  localEnabledModels.value = cleaned;
 }
 
 function toggleModel(modelId: string) {
@@ -665,19 +821,22 @@ function formatPrice(price: number): string {
   return price.toFixed(2);
 }
 
-async function handleUndoApiKey() {
+function handleUndoApiKey() {
   localApiKey.value = originalApiKey.value;
-  await handleApiKeyChange();
+  handleApiKeyChange();
 }
 
-async function handleSaveApiKey() {
-  // Ensure models are fetched before saving
-  await handleApiKeyChange();
+function handleSaveApiKey() {
+  // Check if API key changed before updating
+  const apiKeyChanged = localApiKey.value !== originalApiKey.value;
+  
+  // Filter models based on new API key
+  handleApiKeyChange();
 
   originalApiKey.value = localApiKey.value;
   originalEnabledModels.value = { ...localEnabledModels.value };
   
-  // Validate and clean up lastChatSelectedModels based on new available models
+  // Validate and clean up lastChatSelectedModels based on available models
   let cleanedSelectedModels: LLMModel[] = [];
   if (props.settings.lastChatSelectedModels && props.settings.lastChatSelectedModels.length > 0) {
     cleanedSelectedModels = validateSelectedModels(
@@ -687,9 +846,6 @@ async function handleSaveApiKey() {
     );
   }
   
-  // If no valid models remain after cleaning, set to empty array
-  // The chat component will auto-select a default when it detects empty selection
-  
   const updatedSettings: Settings = {
     ...props.settings,
     apiKeys: {
@@ -697,10 +853,14 @@ async function handleSaveApiKey() {
     },
     availableModels: [...availableModels.value],
     enabledModels: { ...localEnabledModels.value },
-    // Use cleaned selection or empty array to trigger auto-selection
     lastChatSelectedModels: cleanedSelectedModels,
   };
   emit('save', updatedSettings);
+  
+  // Inform user to refresh models if they changed the API key
+  if (apiKeyChanged) {
+    alert('API key saved! Please go to Settings > Data to refresh your model list.');
+  }
 }
 
 function handleUndoModels() {
@@ -729,6 +889,112 @@ function handleSaveModels() {
   emit('save', updatedSettings);
 }
 
+function formatLastRefresh(): string {
+  if (!props.settings.lastModelRefresh) {
+    return 'Never';
+  }
+  
+  const now = Date.now();
+  const diff = now - props.settings.lastModelRefresh;
+  
+  // Less than a minute
+  if (diff < 60000) {
+    return 'Just now';
+  }
+  
+  // Less than an hour
+  if (diff < 3600000) {
+    const minutes = Math.floor(diff / 60000);
+    return `${minutes} minute${minutes !== 1 ? 's' : ''} ago`;
+  }
+  
+  // Less than a day
+  if (diff < 86400000) {
+    const hours = Math.floor(diff / 3600000);
+    return `${hours} hour${hours !== 1 ? 's' : ''} ago`;
+  }
+  
+  // Less than a week
+  if (diff < 604800000) {
+    const days = Math.floor(diff / 86400000);
+    return `${days} day${days !== 1 ? 's' : ''} ago`;
+  }
+  
+  // Format as date
+  return new Date(props.settings.lastModelRefresh).toLocaleString();
+}
+
+async function handleRefreshModels() {
+  if (isRefreshingModels.value) return;
+  
+  isRefreshingModels.value = true;
+  try {
+    console.log('[SettingsPage] Refreshing models...');
+    const allModels = await getAvailableModels();
+    const apiKey = localApiKey.value || SHARED_OPENROUTER_API_KEY;
+    const filtered = filterModelsByApiKey(allModels, apiKey);
+    const sorted = sortModels(filtered);
+    
+    // Update available models
+    availableModels.value = [...sorted];
+    
+    // Clean up enabled models - remove any that are no longer available
+    const availableIds = new Set(sorted.map(m => m.id));
+    const cleaned: Record<string, boolean> = {};
+    Object.keys(localEnabledModels.value).forEach(id => {
+      if (availableIds.has(id) && localEnabledModels.value[id]) {
+        cleaned[id] = true;
+      }
+    });
+    
+    // If no models are enabled after cleaning, enable default models
+    if (Object.keys(cleaned).length === 0 && sorted.length > 0) {
+      const defaultModelIds = [
+        'google/gemma-3n-e4b-it:free',
+        'mistralai/mistral-7b-instruct:free',
+        'moonshotai/kimi-k2:free',
+        'openai/gpt-oss-20b:free',
+      ];
+      
+      let enabledCount = 0;
+      defaultModelIds.forEach(modelId => {
+        const model = sorted.find(m => m.id === modelId);
+        if (model) {
+          cleaned[model.id] = true;
+          enabledCount++;
+        }
+      });
+      
+      // Fallback: if none of the preferred models are available, enable first free model
+      if (enabledCount === 0) {
+        const defaultModel = sorted.find(m => m.isFree) || sorted[0];
+        if (defaultModel) {
+          cleaned[defaultModel.id] = true;
+        }
+      }
+    }
+    
+    localEnabledModels.value = cleaned;
+    
+    // Save with updated timestamp
+    const updatedSettings: Settings = {
+      ...props.settings,
+      availableModels: [...sorted],
+      enabledModels: { ...cleaned },
+      lastModelRefresh: Date.now(),
+    };
+    
+    emit('save', updatedSettings);
+    
+    console.log(`[SettingsPage] Successfully refreshed ${sorted.length} models`);
+  } catch (error) {
+    console.error('[SettingsPage] Failed to refresh models:', error);
+    alert('Failed to refresh models. Please check your internet connection and try again.');
+  } finally {
+    isRefreshingModels.value = false;
+  }
+}
+
 function handleBack() {
   emit('close');
 }
@@ -741,6 +1007,19 @@ function handleBack() {
   line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Custom range slider styling */

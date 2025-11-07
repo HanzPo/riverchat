@@ -73,6 +73,7 @@ export interface Settings {
   enabledModels: Record<string, boolean>; // Model ID -> enabled status (single source of truth)
   lastChatSelectedModels?: LLMModel[]; // Last selected models in chat (persists across prompts)
   availableModels?: LLMModel[]; // All available models from OpenRouter (cached)
+  lastModelRefresh?: number; // Timestamp of last model list refresh
 }
 
 export type NodeType = 'user' | 'ai';

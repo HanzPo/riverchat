@@ -1,32 +1,34 @@
 <template>
   <div v-if="isOpen" class="fixed inset-0 flex flex-col" style="background: var(--color-background); z-index: 1000;">
-    <!-- Header -->
-    <div class="flex items-center justify-between px-6 py-4" style="border-bottom: 1px solid var(--color-border); background: var(--color-background-secondary);">
-      <div class="flex items-center gap-4">
-        <button
-          @click="emit('close')"
-          class="flex items-center gap-2 text-sm font-semibold hover:opacity-80 transition-opacity"
-          style="color: var(--color-text-primary);"
-          title="Back"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M19 12H5M12 19l-7-7 7-7"/>
-          </svg>
-          Back
-        </button>
-        <div v-if="!isNewRootMode" class="h-6 w-px" style="background: var(--color-border);"></div>
-        <div v-if="!isNewRootMode" class="text-sm font-medium" style="color: var(--color-text-tertiary);">
-          {{ path.length }} message{{ path.length !== 1 ? 's' : '' }} in this branch
-        </div>
-      </div>
-      
-      <h1 class="text-lg font-semibold absolute left-1/2 transform -translate-x-1/2" style="color: var(--color-text-primary); letter-spacing: -0.01em;">
+    <!-- Floating Back Button -->
+    <button
+      @click="emit('close')"
+      class="fixed top-4 left-4 z-10 flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg hover:opacity-80 transition-all shadow-lg"
+      style="background: var(--color-background-secondary); color: var(--color-text-primary); border: 1px solid var(--color-border);"
+      title="Back"
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M19 12H5M12 19l-7-7 7-7"/>
+      </svg>
+      Back
+    </button>
+    
+    <!-- Floating Title Label -->
+    <div class="fixed top-4 left-1/2 transform -translate-x-1/2 z-10 px-4 py-2 rounded-lg shadow-lg" style="background: var(--color-background-secondary); border: 1px solid var(--color-border);">
+      <h1 class="text-sm font-semibold" style="color: var(--color-text-primary); letter-spacing: -0.01em;">
         {{ isNewRootMode ? 'New Conversation' : 'Chat History' }}
       </h1>
     </div>
+    
+    <!-- Floating Message Count (only show if not new root mode) -->
+    <div v-if="!isNewRootMode" class="fixed top-4 right-4 z-10 px-3 py-2 rounded-lg shadow-lg" style="background: var(--color-background-secondary); border: 1px solid var(--color-border);">
+      <div class="text-xs font-medium" style="color: var(--color-text-tertiary);">
+        {{ path.length }} message{{ path.length !== 1 ? 's' : '' }}
+      </div>
+    </div>
 
     <!-- Messages -->
-    <div ref="messagesContainer" class="flex-1 overflow-y-auto">
+    <div ref="messagesContainer" class="flex-1 overflow-y-auto pt-16">
       <!-- Empty state -->
       <div v-if="path.length === 0 && !isNewRootMode" class="flex items-center justify-center h-full px-5 py-10">
         <p class="text-sm text-center font-medium" style="color: var(--color-text-tertiary);">
@@ -127,7 +129,7 @@
     </div>
 
     <!-- Input Area (centered like ChatGPT/Claude) -->
-    <div class="border-t" style="border-color: var(--color-border); background: var(--color-background);">
+    <div style="background: var(--color-background);">
       <div class="max-w-3xl mx-auto px-4 py-4">
         <!-- Hint when user node is selected -->
         <div v-if="!canSend && !isNewRootMode && path.length > 0" class="flex items-center justify-center py-10 px-6">
@@ -167,30 +169,31 @@
             </div>
           </div>
 
-          <!-- Model Selection Summary -->
-          <div class="mb-3 p-2.5 rounded-lg flex items-center justify-between gap-2" style="background: var(--color-background-secondary); border: 1px solid var(--color-border);">
-            <div class="flex-1 min-w-0">
-              <div v-if="parsedSelectedModels.length > 0" class="flex flex-wrap gap-1.5">
+          <!-- Model Selection Summary (Compact) -->
+          <div class="mb-2 flex items-center gap-2">
+            <div class="flex-1 min-w-0 flex flex-wrap items-center gap-1">
+              <span class="text-[10px] font-medium" style="color: var(--color-text-tertiary);">Model:</span>
+              <div v-if="parsedSelectedModels.length > 0" class="flex flex-wrap gap-1">
                 <span
                   v-for="model in parsedSelectedModels"
                   :key="model.id"
-                  class="text-[11px] font-semibold px-2 py-0.5 rounded-md"
-                  style="background: var(--color-primary-muted); color: var(--color-primary); border: 1px solid var(--color-primary);"
+                  class="text-[9px] font-semibold px-1.5 py-0.5 rounded"
+                  style="background: var(--color-primary-muted); color: var(--color-primary);"
                 >
                   {{ model.name }}
                 </span>
               </div>
-              <div v-else class="text-[11px] font-medium" style="color: var(--color-text-tertiary);">
-                No models selected
-              </div>
+              <span v-else class="text-[9px] font-medium" style="color: var(--color-text-tertiary);">
+                None
+              </span>
             </div>
             <button
               @click="showModelSelectionModal = true"
-              class="flex items-center justify-center p-2 rounded-md hover:bg-white/5 transition-colors"
-              style="color: var(--color-text-secondary);"
+              class="flex items-center justify-center p-1 rounded hover:bg-white/5 transition-colors"
+              style="color: var(--color-text-tertiary);"
               title="Edit model selection"
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
               </svg>

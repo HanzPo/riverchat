@@ -9,43 +9,47 @@
       />
     </Teleport>
 
-    <!-- Header -->
-    <div class="p-5 flex justify-between items-start gap-4" style="border-bottom: 1px solid var(--color-border); background: var(--color-background-secondary);">
-      <div class="flex-1">
-        <h2 class="text-base font-semibold" style="color: var(--color-text-primary); letter-spacing: -0.01em;">
-          {{ isNewRootMode ? 'New Conversation Thread' : 'Chat History' }}
-        </h2>
-        <p class="text-xs mt-1.5 font-medium" style="color: var(--color-text-tertiary);">
-          {{ isNewRootMode ? 'Start a new root conversation' : `${path.length} message${path.length !== 1 ? 's' : ''} in this branch` }}
-        </p>
-      </div>
-      <div class="flex gap-2 items-center">
-        <button
-          @click="$emit('pop-out')"
-          class="p-2 rounded-md transition-all"
-          style="color: var(--color-text-secondary); cursor: pointer;"
-          title="Pop out chat"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
-            <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" />
-          </svg>
-        </button>
-        <button
-          @click="$emit('close')"
-          class="p-2 rounded-md transition-all"
-          style="color: var(--color-text-secondary); cursor: pointer;"
-          title="Close chat"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
-          </svg>
-        </button>
+    <!-- Floating Title Label -->
+    <div class="absolute top-4 left-4 z-10 px-3 py-2 rounded-lg shadow-lg" style="background: var(--color-background); border: 1px solid var(--color-border);">
+      <h2 class="text-xs font-semibold" style="color: var(--color-text-primary); letter-spacing: -0.01em;">
+        {{ isNewRootMode ? 'New Thread' : 'Chat' }}
+      </h2>
+    </div>
+
+    <!-- Floating Message Count -->
+    <div v-if="!isNewRootMode" class="absolute top-4 left-1/2 transform -translate-x-1/2 z-10 px-3 py-2 rounded-lg shadow-lg" style="background: var(--color-background); border: 1px solid var(--color-border);">
+      <div class="text-[10px] font-medium" style="color: var(--color-text-tertiary);">
+        {{ path.length }} message{{ path.length !== 1 ? 's' : '' }}
       </div>
     </div>
 
+    <!-- Floating Action Buttons -->
+    <div class="absolute top-4 right-4 z-10 flex gap-2">
+      <button
+        @click="$emit('pop-out')"
+        class="p-2 rounded-lg transition-all shadow-lg hover:opacity-80"
+        style="background: var(--color-background); border: 1px solid var(--color-border); color: var(--color-text-secondary); cursor: pointer;"
+        title="Pop out chat"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+          <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
+          <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" />
+        </svg>
+      </button>
+      <button
+        @click="$emit('close')"
+        class="p-2 rounded-lg transition-all shadow-lg hover:opacity-80"
+        style="background: var(--color-background); border: 1px solid var(--color-border); color: var(--color-text-secondary); cursor: pointer;"
+        title="Close chat"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+        </svg>
+      </button>
+    </div>
+
     <!-- Messages -->
-    <div ref="messagesContainer" class="flex-1 overflow-y-auto p-4">
+    <div ref="messagesContainer" class="flex-1 overflow-y-auto p-4 pt-16">
       <div v-if="path.length === 0 && !isNewRootMode" class="flex items-center justify-center h-full px-5 py-10">
         <p class="text-xs text-center font-medium" style="color: var(--color-text-tertiary);">
           Type a message into the chat to create a new thread
@@ -133,7 +137,7 @@
     </div>
 
     <!-- Input Area -->
-    <div class="p-4 border-t border-white/15 card-material">
+    <div class="p-4 card-material">
       <!-- Hint when user node is selected -->
       <div v-if="!canSend && !isNewRootMode && path.length > 0" class="flex items-center justify-center py-8 px-6">
         <div class="text-center">
@@ -171,30 +175,31 @@
           </div>
         </div>
 
-         <!-- Model Selection Summary -->
-         <div class="mb-2.5 p-2 rounded-lg flex items-center justify-between gap-2" style="background: var(--color-background); border: 1px solid var(--color-border);">
-           <div class="flex-1 min-w-0">
+         <!-- Model Selection Summary (Compact) -->
+         <div class="mb-2 flex items-center gap-2">
+           <div class="flex-1 min-w-0 flex flex-wrap items-center gap-1">
+             <span class="text-[10px] font-medium" style="color: var(--color-text-tertiary);">Model:</span>
              <div v-if="parsedSelectedModels.length > 0" class="flex flex-wrap gap-1">
                <span
                  v-for="model in parsedSelectedModels"
                  :key="model.id"
-                 class="text-[10px] font-medium px-1.5 py-0.5 rounded-md"
-                 style="background: var(--color-primary-muted); color: var(--color-primary); border: 1px solid var(--color-primary);"
+                 class="text-[9px] font-semibold px-1.5 py-0.5 rounded"
+                 style="background: var(--color-primary-muted); color: var(--color-primary);"
                >
                  {{ model.name }}
                </span>
              </div>
-             <div v-else class="text-[10px] font-medium" style="color: var(--color-text-tertiary);">
-               No models selected
-             </div>
+             <span v-else class="text-[9px] font-medium" style="color: var(--color-text-tertiary);">
+               None
+             </span>
            </div>
            <button
              @click="showModelSelectionModal = true"
-             class="flex items-center justify-center p-1.5 rounded-md hover:bg-white/5 transition-colors"
-             style="color: var(--color-text-secondary);"
+             class="flex items-center justify-center p-1 rounded hover:bg-white/5 transition-colors"
+             style="color: var(--color-text-tertiary);"
              title="Edit model selection"
            >
-             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
              </svg>

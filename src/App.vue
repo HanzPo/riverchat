@@ -1,57 +1,50 @@
 <template>
-  <div class="w-screen h-screen overflow-hidden" style="background: var(--color-background);">
-    <!-- Top Navigation Bar -->
-    <div class="flex justify-between items-center px-5 py-3" style="border-bottom: 1px solid var(--color-border); background: var(--color-background-secondary);">
-      <div class="flex items-center gap-4">
-        <h1 class="text-lg font-semibold" style="color: var(--color-text-primary); letter-spacing: -0.01em;">
+  <div class="w-screen h-screen overflow-hidden relative" style="background: var(--color-background);">
+    <!-- Floating App Title and Navigation (Top Left) -->
+    <div v-if="!showSettings" class="fixed top-4 left-4 z-50 flex flex-col gap-2">
+      <!-- Logo and River Name -->
+      <div class="flex items-center gap-3 px-4 py-2 rounded-lg shadow-lg" style="background: var(--color-background-secondary); border: 1px solid var(--color-border);">
+        <h1 class="text-sm font-semibold" style="color: var(--color-text-primary); letter-spacing: -0.01em;">
           🌊 RiverChat
         </h1>
-        <span v-if="currentRiver" class="text-sm font-medium" style="color: var(--color-text-secondary);">
+        <span v-if="currentRiver" class="text-xs font-medium px-2 py-0.5 rounded" style="color: var(--color-text-secondary); background: var(--color-background); border: 1px solid var(--color-border);">
           {{ currentRiver.name }}
         </span>
       </div>
 
-      <div class="flex gap-3">
-        <button @click="handleShowRiverDashboard" class="btn-material flex items-center gap-2" title="Manage Rivers (Ctrl+K)">
-          <Folder :size="16" />
+      <!-- Action Buttons -->
+      <div class="flex gap-2">
+        <button @click="handleShowRiverDashboard" class="btn-material text-xs flex items-center gap-1.5 px-3 py-2" title="Manage Rivers (Ctrl+K)">
+          <Folder :size="14" />
           <span>Rivers</span>
         </button>
-        <button @click="handleSearch" class="btn-material" title="Search (Ctrl+F)">
-          <Search :size="16" />
+        <button @click="handleSearch" class="btn-material p-2" title="Search (Ctrl+F)">
+          <Search :size="14" />
         </button>
-        <button @click="showHelp = true" class="btn-material" title="Keyboard Shortcuts (Ctrl+?)">
-          <HelpCircle :size="16" />
+        <button @click="showHelp = true" class="btn-material p-2" title="Keyboard Shortcuts (Ctrl+?)">
+          <HelpCircle :size="14" />
         </button>
-        <button @click="showSettings = true" class="btn-material" title="Settings (Ctrl+,)">
-          <Settings :size="16" />
-        </button>
-
-        <!-- Auth button -->
-        <button
-          v-if="!currentUser"
-          @click="showAuth = true"
-          class="btn-material flex items-center gap-2"
-          title="Sign In"
-        >
-          <UserIcon :size="16" />
-          <span>Sign In</span>
+        <button @click="showSettings = true" class="btn-material p-2" title="Settings (Ctrl+,)">
+          <Settings :size="14" />
         </button>
 
+        <!-- Auth button - only show if not signed in or if signing in -->
         <button
-          v-else
-          @click="handleLogout"
-          class="btn-material flex items-center gap-2"
-          title="Sign Out"
+          v-if="!currentUser || isAuthenticating"
+          @click="!isAuthenticating ? showAuth = true : null"
+          class="btn-material text-xs flex items-center gap-1.5 px-3 py-2"
+          :class="{ 'opacity-60 cursor-wait': isAuthenticating }"
           :disabled="isAuthenticating"
+          :title="isAuthenticating ? 'Signing in...' : 'Sign In'"
         >
-          <LogOut :size="16" />
-          <span>{{ isAuthenticating ? 'Signing out...' : 'Sign Out' }}</span>
+          <UserIcon :size="14" />
+          <span>{{ isAuthenticating ? 'Signing in...' : 'Sign In' }}</span>
         </button>
       </div>
     </div>
 
     <!-- Main Content -->
-    <div class="flex h-[calc(100vh-60px)]">
+    <div class="flex h-screen">
       <!-- Left Panel: Graph Canvas -->
       <div class="flex-1 relative overflow-hidden">
         <GraphCanvas
@@ -75,13 +68,14 @@
           @selection-change="handleSelectionChange"
         />
         
-        <!-- New Root Node Button (Floating) -->
+        <!-- New Root Node Button (Floating - top right, shifts left with chat panel) -->
         <button
           v-if="currentRiver && !selectedNodeId && !isNewRootMode && !hasMultipleNodesSelected && !showSettings"
           @click="handleCreateRootNode"
-          class="absolute top-4 right-4 btn-material px-6 py-3 text-sm font-bold flex items-center gap-2 z-10 shadow-elevation-3"
+          class="fixed top-4 z-50 btn-material px-5 py-2.5 text-sm font-bold flex items-center gap-2 shadow-elevation-3"
+          :style="{ right: (selectedNodeId || isNewRootMode) && !hasMultipleNodesSelected ? `${chatPanelWidth + 16}px` : '16px' }"
         >
-          <Plus :size="18" />
+          <Plus :size="16" />
           <span>New Root Node</span>
         </button>
         
@@ -146,8 +140,11 @@
     <SettingsPage
       v-if="showSettings"
       :settings="settings"
+      :current-user="currentUser"
+      :is-authenticating="isAuthenticating"
       @save="handleSaveSettings"
       @close="showSettings = false"
+      @logout="handleLogout"
     />
 
     <RiverDashboard
@@ -239,7 +236,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRiverChat } from './composables/useRiverChat';
 import type { MessageNode, LLMModel } from './types';
-import { Folder, Search, HelpCircle, Settings, Plus, User as UserIcon, LogOut } from 'lucide-vue-next';
+import { Folder, Search, HelpCircle, Settings, Plus, User as UserIcon } from 'lucide-vue-next';
 import { AuthService } from './services/auth';
 import type { User } from 'firebase/auth';
 
@@ -264,6 +261,7 @@ const {
   loadRiver,
   deleteRiver,
   renameRiver,
+  refreshRivers,
   createUserNode,
   generateAIResponse,
   branchFromText,
@@ -351,8 +349,10 @@ function startResize(e: MouseEvent) {
     const clampedWidth = Math.max(300, Math.min(800, newWidth));
     
     // Use direct DOM manipulation for instant response
-    // This bypasses Vue's reactivity system completely
     panelElement.style.width = `${clampedWidth}px`;
+    
+    // Also update reactive state so floating buttons move in real-time
+    chatPanelWidth.value = clampedWidth;
   };
   
   const onMouseUp = () => {
@@ -506,7 +506,9 @@ async function handleSaveSettings(newSettings: typeof settings.value) {
 }
 
 // River Management
-function handleShowRiverDashboard() {
+async function handleShowRiverDashboard() {
+  // Refresh rivers to get latest node counts
+  await refreshRivers(true);
   showRiverDashboard.value = true;
 }
 
