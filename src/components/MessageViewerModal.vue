@@ -14,7 +14,7 @@
               {{ message.type === 'user' ? 'USER' : 'AI' }}
             </span>
             <span v-if="message.model" class="text-xs font-medium" style="color: var(--color-text-secondary);">
-              {{ message.model.displayName }}
+              {{ message.model.name }}
             </span>
           </div>
           <p class="text-xs font-medium" style="color: var(--color-text-tertiary);">

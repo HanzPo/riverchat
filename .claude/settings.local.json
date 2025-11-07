@@ -2,7 +2,19 @@
   "permissions": {
     "allow": [
       "Bash(grep:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(firebase deploy:*)",
+      "Bash(npm run build:*)",
+      "WebSearch",
+      "WebFetch(domain:platform.openai.com)",
+      "Bash(npm run dev)",
+      "WebFetch(domain:cookbook.openai.com)",
+      "WebFetch(domain:medium.com)",
+      "WebFetch(domain:madhub081011.medium.com)",
+      "WebFetch(domain:jessearmand.com)",
+      "Bash(npm run lint:*)",
+      "Bash(timeout:*)",
+      "WebFetch(domain:openrouter.ai)"
     ],
     "deny": [],
     "ask": []

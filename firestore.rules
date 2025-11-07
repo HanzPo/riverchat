@@ -1,18 +1,67 @@
-rules_version='2'
+rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // User profile data
+    match /users/{userId} {
+      // Users can read and update their own profile
+      allow read: if isOwner(userId);
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow update: if isOwner(userId);
+      allow delete: if false; // Prevent deletion through client
+
+      // User's rivers (conversation threads)
+      match /rivers/{riverId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId);
+        allow update: if isOwner(userId);
+        allow delete: if isOwner(userId);
+      }
+
+      // User's settings (includes encrypted API keys)
+      match /settings/{settingId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId);
+        allow update: if isOwner(userId);
+        allow delete: if isOwner(userId);
+      }
+
+      // Credit transactions (read-only for users, write via Cloud Functions)
+      match /creditTransactions/{transactionId} {
+        allow read: if isOwner(userId);
+        allow create: if false; // Only Cloud Functions can create
+        allow update: if false; // Immutable
+        allow delete: if false; // Cannot delete transactions
+      }
+
+      // User credits balance
+      match /credits/{creditDoc} {
+        allow read: if isOwner(userId);
+        allow create: if false; // Only Cloud Functions can create
+        allow update: if false; // Only Cloud Functions can update
+        allow delete: if false;
+      }
+    }
+
+    // Subscription tier information (public read, admin write)
+    match /subscriptionTiers/{tierId} {
+      allow read: if true; // Anyone can read tier information
+      allow write: if false; // Only admins via Cloud Functions
+    }
+
+    // Block all other access
     match /{document=**} {
-      // This rule allows anyone with your database reference to view, edit,
-      // and delete all data in your database. It is useful for getting
-      // started, but it is configured to expire after 30 days because it
-      // leaves your app open to attackers. At that time, all client
-      // requests to your database will be denied.
-      //
-      // Make sure to write security rules for your app before that time, or
-      // else all client requests to your database will be denied until you
-      // update your rules.
-      allow read, write: if request.time < timestamp.date(2025, 12, 6);
+      allow read, write: if false;
     }
   }
 }

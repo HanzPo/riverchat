@@ -25,6 +25,28 @@
         <button @click="showSettings = true" class="btn-material" title="Settings (Ctrl+,)">
           <Settings :size="16" />
         </button>
+
+        <!-- Auth button -->
+        <button
+          v-if="!currentUser"
+          @click="showAuth = true"
+          class="btn-material flex items-center gap-2"
+          title="Sign In"
+        >
+          <UserIcon :size="16" />
+          <span>Sign In</span>
+        </button>
+
+        <button
+          v-else
+          @click="handleLogout"
+          class="btn-material flex items-center gap-2"
+          title="Sign Out"
+          :disabled="isAuthenticating"
+        >
+          <LogOut :size="16" />
+          <span>{{ isAuthenticating ? 'Signing out...' : 'Sign Out' }}</span>
+        </button>
       </div>
     </div>
 
@@ -55,7 +77,7 @@
         
         <!-- New Root Node Button (Floating) -->
         <button
-          v-if="currentRiver && !selectedNodeId && !isNewRootMode && !hasMultipleNodesSelected"
+          v-if="currentRiver && !selectedNodeId && !isNewRootMode && !hasMultipleNodesSelected && !showSettings"
           @click="handleCreateRootNode"
           class="absolute top-4 right-4 btn-material px-6 py-3 text-sm font-bold flex items-center gap-2 z-10 shadow-elevation-3"
         >
@@ -101,10 +123,12 @@
           :last-used-model="settings.lastUsedModel"
           :is-new-root-mode="isNewRootMode"
           :all-nodes="currentRiver?.nodes || {}"
+          :api-keys="settings.apiKeys"
+          :settings="settings"
           @send="handleSendMessage"
           @node-select="selectNode"
           @branch-from-text="handleBranchFromText"
-          @model-changed="handleModelChanged"
+          @chat-model-changed="handleChatModelChanged"
           @close="handleCloseChatPanel"
           @pop-out="handlePopOutChat"
         />
@@ -114,12 +138,13 @@
     <!-- Modals -->
     <WelcomeModal
       :is-open="showWelcome"
-      :can-dismiss="false"
+      :can-dismiss="true"
       @save="handleSaveAPIKeys"
+      @close="showWelcome = false"
     />
 
-    <SettingsModal
-      :is-open="showSettings"
+    <SettingsPage
+      v-if="showSettings"
       :settings="settings"
       @save="handleSaveSettings"
       @close="showSettings = false"
@@ -187,15 +212,24 @@
       :last-used-model="settings.lastUsedModel"
       :is-new-root-mode="isNewRootMode"
       :all-nodes="currentRiver?.nodes || {}"
+      :api-keys="settings.apiKeys"
+      :settings="settings"
       @send="handleSendMessage"
       @node-select="selectNode"
       @branch-from-text="handleBranchFromText"
-      @model-changed="handleModelChanged"
+      @chat-model-changed="handleChatModelChanged"
       @close="showChatModal = false"
     />
 
+    <!-- Auth Modal -->
+    <AuthModal
+      :is-open="showAuth"
+      @close="showAuth = false"
+      @authenticated="handleAuthenticated"
+    />
+
     <!-- Toast Notification -->
-    <div v-if="toast.visible" class="toast" :class="`toast-${toast.type}`">
+    <div v-if="toast.visible && !showSettings" class="toast" :class="`toast-${toast.type}`">
       {{ toast.message }}
     </div>
   </div>
@@ -205,17 +239,20 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRiverChat } from './composables/useRiverChat';
 import type { MessageNode, LLMModel } from './types';
-import { Folder, Search, HelpCircle, Settings, Plus } from 'lucide-vue-next';
+import { Folder, Search, HelpCircle, Settings, Plus, User as UserIcon, LogOut } from 'lucide-vue-next';
+import { AuthService } from './services/auth';
+import type { User } from 'firebase/auth';
 
 import GraphCanvas from './components/GraphCanvas.vue';
 import ChatHistory from './components/ChatHistory.vue';
 import ChatModal from './components/ChatModal.vue';
 import WelcomeModal from './components/WelcomeModal.vue';
-import SettingsModal from './components/SettingsModal.vue';
+import SettingsPage from './components/SettingsPage.vue';
 import RiverDashboard from './components/RiverDashboard.vue';
 import MessageViewerModal from './components/MessageViewerModal.vue';
 import ConfirmationModal from './components/ConfirmationModal.vue';
 import KeyboardShortcutsModal from './components/KeyboardShortcutsModal.vue';
+import AuthModal from './components/AuthModal.vue';
 
 const {
   currentRiver,
@@ -238,6 +275,7 @@ const {
   updateSettings,
   updateAPIKeys,
   selectNode,
+  clearState,
   initialize,
 } = useRiverChat();
 
@@ -248,9 +286,14 @@ const showRiverDashboard = ref(false);
 const showMessageViewer = ref(false);
 const showHelp = ref(false);
 const showChatModal = ref(false);
+const showAuth = ref(false);
 const viewingMessage = ref<MessageNode | null>(null);
 const isNewRootMode = ref(false);
 const hasMultipleNodesSelected = ref(false);
+
+// Authentication state
+const currentUser = ref<User | null>(null);
+const isAuthenticating = ref(false);
 
 // Resizable chat panel
 const chatPanelWidth = ref(400);
@@ -335,17 +378,62 @@ function startResize(e: MouseEvent) {
 }
 
 // Initialize app
-onMounted(() => {
-  initialize();
-  
+onMounted(async () => {
+  // Check for cached auth state for optimistic rendering
+  const cachedAuth = AuthService.getCachedAuthState();
+  if (cachedAuth) {
+    console.log('[App] Found cached auth state, using optimistically');
+    // Set optimistic user state (will be confirmed by Firebase Auth)
+    currentUser.value = {
+      uid: cachedAuth.uid,
+      email: cachedAuth.email,
+      displayName: cachedAuth.displayName,
+    } as any;
+  }
+
+  // Initialize the app with cached data
+  await initialize();
+
+  // Listen to authentication state changes
+  let isFirstAuthCheck = true;
+  AuthService.onAuthStateChanged(async (user) => {
+    const wasLoggedIn = !!currentUser.value;
+    currentUser.value = user;
+
+    if (user) {
+      console.log('User authenticated:', user.email);
+
+      // Only reinitialize if this is not the first check (avoiding double initialization)
+      // or if user state changed (e.g., from logged out to logged in)
+      if (!isFirstAuthCheck && !wasLoggedIn) {
+        // Clear chat selection on login to avoid stale models
+        settings.value.lastChatSelectedModels = [];
+
+        // User just logged in - reload data from Firestore with force refresh
+        await initialize(true);
+      } else {
+        console.log('[App] User already initialized, skipping re-initialization');
+      }
+    } else {
+      console.log('User signed out - using localStorage');
+      // User is signed out - will use localStorage fallback
+      if (wasLoggedIn) {
+        // User just logged out, reinitialize with local data
+        await initialize();
+      }
+    }
+
+    isFirstAuthCheck = false;
+  });
+
   // Load saved chat panel width from session storage
   const savedWidth = sessionStorage.getItem('chatPanelWidth');
   if (savedWidth) {
     chatPanelWidth.value = parseInt(savedWidth, 10);
   }
-  
-  // Show welcome modal if no API keys
-  if (!hasAPIKeys.value) {
+
+  // Show welcome modal only for brand new users (no API keys, no rivers, not logged in)
+  if (!hasAPIKeys.value && !currentUser.value && allRivers.value.length === 0) {
     showWelcome.value = true;
   }
 
@@ -356,55 +444,101 @@ onMounted(() => {
   document.body.className = 'dark-theme';
 });
 
+// Authentication handlers
+async function handleAuthenticated() {
+  // User just logged in/registered
+  isAuthenticating.value = true;
+
+  try {
+    // Reload data from Firestore with force refresh
+    await initialize(true);
+    showToast('Successfully signed in!', 'success');
+  } catch (error) {
+    console.error('Error loading user data:', error);
+    showToast('Failed to load your data', 'error');
+  } finally {
+    isAuthenticating.value = false;
+  }
+}
+
+async function handleLogout() {
+  try {
+    isAuthenticating.value = true;
+    await AuthService.logout();
+
+    // Clear local state
+    clearState();
+
+    showToast('Signed out successfully', 'success');
+
+    // Reload app to use localStorage fallback
+    setTimeout(() => {
+      window.location.reload();
+    }, 500);
+  } catch (error) {
+    console.error('Logout error:', error);
+    showToast('Failed to sign out', 'error');
+  } finally {
+    isAuthenticating.value = false;
+  }
+}
+
 // API Keys Management
-function handleSaveAPIKeys(apiKeys: typeof settings.value.apiKeys) {
-  updateAPIKeys(apiKeys);
+async function handleSaveAPIKeys(apiKeys: typeof settings.value.apiKeys) {
+  await updateAPIKeys(apiKeys);
   showWelcome.value = false;
   showToast('API keys saved successfully', 'success');
-  
+
   // Create first river if none exists
   if (allRivers.value.length === 0) {
-    handleCreateFirstRiver();
+    await handleCreateFirstRiver();
   }
 }
 
 // Settings Management
-function handleSaveSettings(newSettings: typeof settings.value) {
-  updateSettings(newSettings);
+async function handleSaveSettings(newSettings: typeof settings.value) {
+  console.log('[App.vue] handleSaveSettings received:', {
+    hasAPIKeys: !!newSettings.apiKeys.openrouter,
+    apiKeys: {
+      openrouter: newSettings.apiKeys.openrouter ? `${newSettings.apiKeys.openrouter.substring(0, 10)}...` : 'empty'
+    }
+  });
+
+  await updateSettings(newSettings);
   showSettings.value = false;
   showToast('Settings saved', 'success');
 }
 
 // River Management
-function handleCreateFirstRiver() {
-  const river = createRiver('My First River');
+async function handleCreateFirstRiver() {
+  const river = await createRiver('My First River');
   showToast(`Created "${river.name}"`, 'success');
 }
 
-function handleCreateRiver(name: string) {
-  const river = createRiver(name);
+async function handleCreateRiver(name: string) {
+  const river = await createRiver(name);
   showToast(`Created "${river.name}"`, 'success');
 }
 
-function handleOpenRiver(riverId: string) {
-  if (loadRiver(riverId)) {
+async function handleOpenRiver(riverId: string) {
+  if (await loadRiver(riverId)) {
     showToast('River loaded', 'success');
   }
 }
 
-function handleRenameRiver(riverId: string, newName: string) {
-  renameRiver(riverId, newName);
+async function handleRenameRiver(riverId: string, newName: string) {
+  await renameRiver(riverId, newName);
   showToast('River renamed', 'success');
 }
 
-function handleDeleteRiver(riverId: string) {
+async function handleDeleteRiver(riverId: string) {
   const river = allRivers.value.find((r) => r.id === riverId);
-  deleteRiver(riverId);
+  await deleteRiver(riverId);
   showToast(`Deleted "${river?.name}"`, 'success');
 }
 
 // Message Handling
-async function handleSendMessage(content: string, model: LLMModel) {
+async function handleSendMessage(content: string, models: LLMModel[]) {
   if (!currentRiver.value) {
     handleCreateFirstRiver();
     // Wait a tick for river to be created
@@ -413,9 +547,9 @@ async function handleSendMessage(content: string, model: LLMModel) {
 
   try {
     // If in new root mode, create a new root node (parentId = null)
-    const parentId = isNewRootMode.value 
-      ? null 
-      : (currentPath.value.length > 0 
+    const parentId = isNewRootMode.value
+      ? null
+      : (currentPath.value.length > 0
           ? currentPath.value[currentPath.value.length - 1]?.id || null
           : null);
 
@@ -428,8 +562,9 @@ async function handleSendMessage(content: string, model: LLMModel) {
     const userNode = createUserNode(content, parentId);
     selectNode(userNode.id);
 
-    // Generate AI response
-    await generateAIResponse(userNode.id, model);
+    // Generate AI responses for all selected models in parallel
+    const promises = models.map(model => generateAIResponse(userNode.id, model));
+    await Promise.all(promises);
   } catch (error) {
     showToast(error instanceof Error ? error.message : 'Failed to send message', 'error');
   }
@@ -452,12 +587,12 @@ async function handleRegenerate(parentNodeId: string) {
   const parentNode = currentRiver.value.nodes[parentNodeId];
   if (!parentNode) return;
 
-  // Use the last used model or default
-  const model = settings.value.lastUsedModel || {
-    provider: 'openai' as const,
-    name: 'gpt-4o',
-    displayName: 'GPT-4o',
-  };
+  // Use the last used model or first available model
+  const model = settings.value.lastUsedModel || settings.value.availableModels?.[0];
+  if (!model) {
+    showToast('No models available', 'error');
+    return;
+  }
 
   try {
     showToast('Generating new response...', 'info');
@@ -494,14 +629,13 @@ function confirmEditResubmit() {
     updateNodeContent(nodeId, newContent.trim());
 
     // Generate new response
-    const model = settings.value.lastUsedModel || {
-      provider: 'openai' as const,
-      name: 'gpt-4o',
-      displayName: 'GPT-4o',
-    };
-    generateAIResponse(nodeId, model);
-    
-    showToast('Message updated, generating new response...', 'info');
+    const model = settings.value.lastUsedModel || settings.value.availableModels?.[0];
+    if (model) {
+      generateAIResponse(nodeId, model);
+      showToast('Message updated, generating new response...', 'info');
+    } else {
+      showToast('No models available', 'error');
+    }
   }
 }
 
@@ -558,6 +692,9 @@ function confirmDeleteBranchesBatch() {
     showToast(`Deleted ${nodeIds.length} nodes`, 'success');
   }
   deleteBatchConfirmation.value.isOpen = false;
+  
+  // Clear multi-selection state to prevent chat window from showing
+  hasMultipleNodesSelected.value = false;
 }
 
 function handleCopyMessage(content: string) {
@@ -593,20 +730,24 @@ function handleSearch() {
   showToast('Search functionality coming soon!', 'info');
 }
 
-async function handleBranchFromText(nodeId: string, highlightedText: string, userPrompt: string, model: LLMModel) {
+async function handleBranchFromText(nodeId: string, highlightedText: string, userPrompt: string, models: LLMModel[]) {
   if (!currentRiver.value) return;
 
   try {
-    await branchFromText(nodeId, highlightedText, userPrompt, model);
-    showToast('Creating branch with selected context...', 'info');
+    // Create branches for all selected models in parallel
+    const promises = models.map(model => branchFromText(nodeId, highlightedText, userPrompt, model));
+    await Promise.all(promises);
+    showToast(`Creating ${models.length} branch${models.length > 1 ? 'es' : ''} with selected context...`, 'info');
   } catch (error) {
     showToast(error instanceof Error ? error.message : 'Failed to create branch', 'error');
   }
 }
 
-function handleModelChanged(model: LLMModel) {
-  // Persist the selected model to settings
-  settings.value.lastUsedModel = model;
+async function handleChatModelChanged(models: LLMModel[]) {
+  // Save chat model selection to persist across prompts and sessions
+  settings.value.lastChatSelectedModels = models;
+  // Persist to database immediately
+  await updateSettings({ lastChatSelectedModels: models });
 }
 
 function handleCloseChatPanel() {
