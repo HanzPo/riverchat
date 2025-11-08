@@ -120,6 +120,7 @@
           :api-keys="settings.apiKeys"
           :settings="settings"
           :is-sending="isSendingMessage"
+          :current-user="currentUser"
           @send="handleSendMessage"
           @node-select="selectNode"
           @branch-from-text="handleBranchFromText"
@@ -214,6 +215,7 @@
       :api-keys="settings.apiKeys"
       :settings="settings"
       :is-sending="isSendingMessage"
+      :current-user="currentUser"
       @send="handleSendMessage"
       @node-select="selectNode"
       @branch-from-text="handleBranchFromText"
@@ -597,7 +599,7 @@ async function handleDeleteRiver(riverId: string) {
 }
 
 // Message Handling
-async function handleSendMessage(content: string, models: LLMModel[]) {
+async function handleSendMessage(content: string, models: LLMModel[], webSearchEnabled: boolean) {
   if (!currentRiver.value) {
     handleCreateFirstRiver();
     // Wait a tick for river to be created
@@ -623,7 +625,7 @@ async function handleSendMessage(content: string, models: LLMModel[]) {
     selectNode(userNode.id);
 
     // Generate AI responses for all selected models in parallel
-    const promises = models.map(model => generateAIResponse(userNode.id, model));
+    const promises = models.map(model => generateAIResponse(userNode.id, model, webSearchEnabled));
     await Promise.all(promises);
   } catch (error) {
     showToast(error instanceof Error ? error.message : 'Failed to send message', 'error');
@@ -658,7 +660,7 @@ async function handleRegenerate(parentNodeId: string) {
 
   try {
     showToast('Generating new response...', 'info');
-    await generateAIResponse(parentNodeId, model);
+    await generateAIResponse(parentNodeId, model, false);
   } catch (error) {
     showToast('Failed to regenerate response', 'error');
   }
@@ -693,7 +695,7 @@ function confirmEditResubmit() {
     // Generate new response
     const model = settings.value.lastUsedModel || settings.value.availableModels?.[0];
     if (model) {
-      generateAIResponse(nodeId, model);
+      generateAIResponse(nodeId, model, false);
       showToast('Message updated, generating new response...', 'info');
     } else {
       showToast('No models available', 'error');
@@ -792,13 +794,13 @@ function handleSearch() {
   showToast('Search functionality coming soon!', 'info');
 }
 
-async function handleBranchFromText(nodeId: string, highlightedText: string, userPrompt: string, models: LLMModel[]) {
+async function handleBranchFromText(nodeId: string, highlightedText: string, userPrompt: string, models: LLMModel[], webSearchEnabled: boolean) {
   if (!currentRiver.value) return;
 
   isSendingMessage.value = true;
   try {
     // Create branches for all selected models in parallel
-    const promises = models.map(model => branchFromText(nodeId, highlightedText, userPrompt, model));
+    const promises = models.map(model => branchFromText(nodeId, highlightedText, userPrompt, model, webSearchEnabled));
     await Promise.all(promises);
     showToast(`Creating ${models.length} branch${models.length > 1 ? 'es' : ''} with selected context...`, 'info');
   } catch (error) {

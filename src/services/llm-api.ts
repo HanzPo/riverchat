@@ -46,6 +46,7 @@ export class LLMAPIService {
     parentNode: MessageNode,
     allNodes: Record<string, MessageNode>,
     apiKeys: APIKeys,
+    webSearchEnabled: boolean,
     onToken: (token: string) => void,
     onComplete: () => void,
     onError: (error: string) => void
@@ -57,6 +58,7 @@ export class LLMAPIService {
         model,
         context,
         apiKeys.openrouter || SHARED_OPENROUTER_API_KEY,
+        webSearchEnabled,
         onToken,
         onComplete,
         onError
@@ -70,18 +72,24 @@ export class LLMAPIService {
     model: LLMModel,
     messages: ChatMessage[],
     apiKey: string,
+    webSearchEnabled: boolean,
     onToken: (token: string) => void,
     onComplete: () => void,
     onError: (error: string) => void
   ): Promise<void> {
     try {
-      console.log(`[OpenRouter] Using model: ${model.id}`);
+      console.log(`[OpenRouter] Using model: ${model.id}${webSearchEnabled ? ' with web search' : ''}`);
 
-      const requestBody = {
+      const requestBody: any = {
         model: model.id,
         messages,
         stream: true,
       };
+
+      // Add web search plugin if enabled
+      if (webSearchEnabled) {
+        requestBody.plugins = [{ id: 'web' }];
+      }
 
       const response = await fetch(OPENROUTER_API_URL, {
         method: 'POST',
