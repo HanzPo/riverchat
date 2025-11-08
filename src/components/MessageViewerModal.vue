@@ -58,15 +58,8 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
-import { marked } from 'marked';
-import DOMPurify from 'dompurify';
 import type { MessageNode } from '../types';
-
-// Configure marked for better rendering
-marked.setOptions({
-  breaks: true, // Convert \n to <br>
-  gfm: true, // GitHub Flavored Markdown
-});
+import { renderMarkdown } from '../utils/chat';
 
 interface Props {
   isOpen: boolean;
@@ -81,12 +74,6 @@ const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
 const copied = ref(false);
-
-// Render markdown content safely
-function renderMarkdown(content: string): string {
-  const html = marked.parse(content) as string;
-  return DOMPurify.sanitize(html);
-}
 
 function formatTimestamp(timestamp: number): string {
   const date = new Date(timestamp);

@@ -243,14 +243,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch, defineAsyncComponent } from 'vue';
 import { useRiverChat } from './composables/useRiverChat';
 import type { MessageNode, LLMModel } from './types';
 import { Folder, Search, HelpCircle, Settings, Plus, User as UserIcon } from 'lucide-vue-next';
 import { AuthService } from './services/auth';
 import type { User } from 'firebase/auth';
-
-import { defineAsyncComponent } from 'vue';
 
 // Critical components loaded immediately
 import GraphCanvas from './components/GraphCanvas.vue';
@@ -315,7 +313,6 @@ const isRiverOperationLoading = ref(false);
 
 // Resizable chat panel
 const chatPanelWidth = ref(400);
-const isResizing = ref(false);
 const chatPanel = ref<HTMLElement | null>(null);
 const graphCanvas = ref<any>(null);
 
@@ -362,8 +359,6 @@ function startResize(e: MouseEvent) {
   e.preventDefault();
   if (!chatPanel.value) return;
   
-  isResizing.value = true;
-  
   // Add styles to prevent text selection and improve performance during drag
   document.body.style.cursor = 'col-resize';
   document.body.style.userSelect = 'none';
@@ -385,8 +380,6 @@ function startResize(e: MouseEvent) {
   };
   
   const onMouseUp = () => {
-    isResizing.value = false;
-    
     // Restore body styles
     document.body.style.cursor = '';
     document.body.style.userSelect = '';

@@ -81,12 +81,12 @@
                     <span>{{ message.type === 'user' ? 'YOU' : 'AI' }}</span>
                   </span>
                   <span
-                    v-if="getBranchCount(message.id) > 0"
+                    v-if="getBranchCount(message.id, props.allNodes) > 0"
                     class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-accent/30 border border-accent/50 text-accent flex items-center gap-1"
-                    :title="`${getBranchCount(message.id)} branch${getBranchCount(message.id) > 1 ? 'es' : ''} from highlighted text`"
+                    :title="`${getBranchCount(message.id, props.allNodes)} branch${getBranchCount(message.id, props.allNodes) > 1 ? 'es' : ''} from highlighted text`"
                   >
                     <GitBranch :size="11" />
-                    <span>{{ getBranchCount(message.id) }}</span>
+                    <span>{{ getBranchCount(message.id, props.allNodes) }}</span>
                   </span>
                 </div>
                 <span v-if="message.model" class="text-xs font-medium overflow-hidden text-ellipsis whitespace-nowrap" style="color: var(--color-text-tertiary);">
@@ -253,11 +253,10 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
-import { marked } from 'marked';
-import DOMPurify from 'dompurify';
 import type { MessageNode, LLMModel, APIKeys, Settings } from '../types';
 import { getEnabledModelsList } from '../types';
 import { User, Bot, GitBranch, AlertTriangle, MessageCircle, X } from 'lucide-vue-next';
+import { renderMarkdown, formatTime, getBranchCount } from '../utils/chat';
 import TextHighlightPopover from './TextHighlightPopover.vue';
 import ModelSelectionModal from './ModelSelectionModal.vue';
 
@@ -305,26 +304,6 @@ const branchContext = ref({
 });
 
 let isSelecting = false;
-
-// Configure marked for better rendering
-marked.setOptions({
-  breaks: true, // Convert \n to <br>
-  gfm: true, // GitHub Flavored Markdown
-});
-
-// Helper to get branch count for a message
-function getBranchCount(nodeId: string): number {
-  if (!props.allNodes) return 0;
-  return Object.values(props.allNodes).filter(
-    node => node.branchMetadata?.sourceNodeId === nodeId
-  ).length;
-}
-
-// Render markdown content safely
-function renderMarkdown(content: string): string {
-  const html = marked.parse(content) as string;
-  return DOMPurify.sanitize(html);
-}
 
 // Get enabled models from settings
 const enabledModels = computed(() => {
@@ -513,11 +492,6 @@ function handleSend() {
       }
     });
   }
-}
-
-function formatTime(timestamp: number): string {
-  const date = new Date(timestamp);
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 function handleTextSelection(event: MouseEvent, nodeId: string) {
