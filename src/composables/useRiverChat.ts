@@ -285,7 +285,7 @@ export function useRiverChat() {
     return node;
   }
 
-  async function generateAIResponse(userNodeId: string, model: LLMModel): Promise<void> {
+  async function generateAIResponse(userNodeId: string, model: LLMModel, webSearchEnabled: boolean = false): Promise<void> {
     if (!currentRiver.value) {
       throw new Error('No active river');
     }
@@ -306,6 +306,7 @@ export function useRiverChat() {
       userNode,
       currentRiver.value.nodes,
       settings.value.apiKeys,
+      webSearchEnabled,
       (token: string) => {
         // On token received
         if (currentRiver.value) {
@@ -341,7 +342,8 @@ export function useRiverChat() {
     sourceNodeId: string,
     highlightedText: string,
     userPrompt: string,
-    model: LLMModel
+    model: LLMModel,
+    webSearchEnabled: boolean = false
   ): Promise<void> {
     if (!currentRiver.value) {
       throw new Error('No active river');
@@ -373,7 +375,7 @@ export function useRiverChat() {
     selectedNodeId.value = userNode.id;
 
     // Generate AI response for this branch
-    await generateAIResponse(userNode.id, model);
+    await generateAIResponse(userNode.id, model, webSearchEnabled);
   }
 
   function deleteNode(nodeId: string): void {

@@ -172,6 +172,18 @@
           <!-- Model Selection Summary (Compact) -->
           <div class="mb-2 flex items-center gap-2">
             <button
+              @click="canEnableWebSearch ? webSearchEnabled = !webSearchEnabled : null"
+              class="flex items-center justify-center rounded-lg transition-all"
+              :class="{ 'hover:opacity-80': canEnableWebSearch, 'cursor-not-allowed opacity-50': !canEnableWebSearch }"
+              :style="'width: 20px; height: 20px; background: transparent; cursor: ' + (canEnableWebSearch ? 'pointer' : 'not-allowed') + ';'"
+              :title="canEnableWebSearch ? (webSearchEnabled ? 'Web search enabled' : 'Web search disabled') : 'Upgrade to use web search'"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="webSearchEnabled && canEnableWebSearch ? 'color: var(--color-primary);' : 'color: var(--color-text-tertiary);'">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+              </svg>
+            </button>
+            <button
               @click="showModelSelectionModal = true"
               class="flex items-center justify-center p-1 rounded hover:bg-white/5 transition-colors"
               style="color: var(--color-text-tertiary);"
@@ -258,6 +270,7 @@ import { User, Bot, GitBranch, AlertTriangle, MessageCircle, X } from 'lucide-vu
 import { renderMarkdown, formatTime, getBranchCount } from '../utils/chat';
 import TextHighlightPopover from './TextHighlightPopover.vue';
 import ModelSelectionModal from './ModelSelectionModal.vue';
+import type { User as FirebaseUser } from 'firebase/auth';
 
 interface Props {
   isOpen: boolean;
@@ -269,13 +282,14 @@ interface Props {
   apiKeys?: APIKeys;
   settings?: Settings;
   isSending?: boolean;
+  currentUser?: FirebaseUser | null;
 }
 
 interface Emits {
   (e: 'close'): void;
-  (e: 'send', content: string, models: LLMModel[]): void;
+  (e: 'send', content: string, models: LLMModel[], webSearchEnabled: boolean): void;
   (e: 'node-select', nodeId: string): void;
-  (e: 'branch-from-text', nodeId: string, highlightedText: string, elaborationPrompt: string, models: LLMModel[]): void;
+  (e: 'branch-from-text', nodeId: string, highlightedText: string, elaborationPrompt: string, models: LLMModel[], webSearchEnabled: boolean): void;
   (e: 'chat-model-changed', models: LLMModel[]): void;
 }
 
@@ -287,6 +301,12 @@ const selectedModels = ref<string[]>([]);
 const messagesContainer = ref<HTMLElement | null>(null);
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
 const showModelSelectionModal = ref(false);
+const webSearchEnabled = ref(false);
+
+// Check if web search can be enabled (user must be logged in AND have an API key)
+const canEnableWebSearch = computed(() => {
+  return !!props.currentUser && !!props.apiKeys?.openrouter && props.apiKeys.openrouter.trim().length > 0;
+});
 
 // Text selection and highlight popover state
 const highlightPopover = ref({
@@ -388,13 +408,10 @@ watch(
   { deep: true }
 );
 
-// Watch for model changes and persist to lastChatSelectedModels (persists across prompts)
-// Only emit if not currently restoring to prevent infinite loops
-watch(selectedModels, (newModels) => {
-  if (!isRestoringSelection.value && newModels && newModels.length > 0) {
-    const models = newModels.map(m => JSON.parse(m) as LLMModel);
-    // Emit to save to lastChatSelectedModels
-    emit('chat-model-changed', models);
+// Watch for changes in canEnableWebSearch and disable web search if conditions are no longer met
+watch(canEnableWebSearch, (canEnable) => {
+  if (!canEnable && webSearchEnabled.value) {
+    webSearchEnabled.value = false;
   }
 });
 
@@ -476,11 +493,11 @@ function handleSend() {
     // Check if we have branch context
     if (branchContext.value.text && branchContext.value.sourceNodeId) {
       // Send as a branch with context
-      emit('branch-from-text', branchContext.value.sourceNodeId, branchContext.value.text, inputText.value.trim(), models);
+      emit('branch-from-text', branchContext.value.sourceNodeId, branchContext.value.text, inputText.value.trim(), models, webSearchEnabled.value);
       clearBranchContext();
     } else {
       // Regular message
-      emit('send', inputText.value.trim(), models);
+      emit('send', inputText.value.trim(), models, webSearchEnabled.value);
     }
 
     inputText.value = '';
