@@ -95,7 +95,7 @@
               </div>
 
               <!-- Branch Metadata (if this message is a branch) -->
-              <div v-if="message.branchMetadata" class="mb-3 p-3 bg-accent/10 border border-accent/30 rounded-lg">
+              <div v-if="message.branchMetadata" class="mb-2 p-3 bg-accent/10 border border-accent/30 rounded-lg">
                 <div class="text-[10px] font-bold uppercase tracking-wider mb-1.5" style="color: var(--color-text-tertiary);">Selected Text</div>
                 <div class="text-xs italic font-medium pl-2.5 border-l-2 border-accent/50" style="color: var(--color-text-secondary);">
                   "{{ message.branchMetadata.highlightedText }}"
