@@ -122,6 +122,7 @@
           :is-sending="isSendingMessage"
           :current-user="currentUser"
           @send="handleSendMessage"
+          @resend="handleResend"
           @node-select="selectNode"
           @branch-from-text="handleBranchFromText"
           @chat-model-changed="handleChatModelChanged"
@@ -217,6 +218,7 @@
       :is-sending="isSendingMessage"
       :current-user="currentUser"
       @send="handleSendMessage"
+      @resend="handleResend"
       @node-select="selectNode"
       @branch-from-text="handleBranchFromText"
       @chat-model-changed="handleChatModelChanged"
@@ -629,6 +631,31 @@ async function handleSendMessage(content: string, models: LLMModel[], webSearchE
     await Promise.all(promises);
   } catch (error) {
     showToast(error instanceof Error ? error.message : 'Failed to send message', 'error');
+  } finally {
+    isSendingMessage.value = false;
+  }
+}
+
+async function handleResend(userNodeId: string, models: LLMModel[], webSearchEnabled: boolean) {
+  if (!currentRiver.value) {
+    handleCreateFirstRiver();
+    // Wait a tick for river to be created
+    await new Promise(resolve => setTimeout(resolve, 0));
+  }
+
+  const userNode = currentRiver.value?.nodes[userNodeId];
+  if (!userNode || userNode.type !== 'user') {
+    showToast('Invalid user message', 'error');
+    return;
+  }
+
+  isSendingMessage.value = true;
+  try {
+    // Generate AI responses directly from the existing user node (no new user node created)
+    const promises = models.map(model => generateAIResponse(userNodeId, model, webSearchEnabled));
+    await Promise.all(promises);
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : 'Failed to resend message', 'error');
   } finally {
     isSendingMessage.value = false;
   }

@@ -13,7 +13,7 @@
     @contextmenu.prevent="handleContextMenu"
   >
     <!-- Header -->
-    <div class="flex justify-between items-center mb-3 gap-2">
+    <div class="flex justify-between items-center mb-2.5 gap-2">
       <span
         class="text-[10px] font-semibold px-2.5 py-1 rounded-md uppercase tracking-wide flex items-center gap-1.5"
         :style="data.type === 'user'
@@ -38,7 +38,7 @@
     </div>
 
     <!-- Content Preview -->
-    <div class="text-sm leading-relaxed mb-3 break-words whitespace-pre-wrap font-normal" style="color: var(--color-text-primary);">
+    <div class="text-sm leading-relaxed mb-2.5 break-words whitespace-pre-wrap font-normal" style="color: var(--color-text-primary);">
       {{ truncateContent(data.content) }}
       <span v-if="data.state === 'generating'" class="inline-block animate-blink font-bold" style="color: var(--color-primary);">▊</span>
     </div>

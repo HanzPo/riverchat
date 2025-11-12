@@ -131,18 +131,77 @@
     <!-- Input Area (centered like ChatGPT/Claude) -->
     <div style="background: var(--color-background);">
       <div class="max-w-3xl mx-auto px-4 py-4">
-        <!-- Hint when user node is selected -->
-        <div v-if="!canSend && !isNewRootMode && path.length > 0" class="flex items-center justify-center py-10 px-6">
-          <div class="text-center">
-            <div class="flex justify-center mb-4">
-              <MessageCircle :size="48" :stroke-width="1.5" style="color: var(--color-text-tertiary);" />
+        <!-- Resend interface when user node is selected -->
+        <div v-if="!canSend && !isNewRootMode && path.length > 0 && selectedUserMessage" class="py-4">
+          <!-- Model Selection Summary (Compact) -->
+          <div class="mb-2 flex items-center gap-2">
+            <button
+              @click="canEnableWebSearch ? webSearchEnabled = !webSearchEnabled : null"
+              class="flex items-center justify-center rounded-lg transition-all"
+              :class="{ 'hover:opacity-80': canEnableWebSearch, 'cursor-not-allowed opacity-50': !canEnableWebSearch }"
+              :style="'width: 20px; height: 20px; background: transparent; cursor: ' + (canEnableWebSearch ? 'pointer' : 'not-allowed') + ';'"
+              :title="canEnableWebSearch ? (webSearchEnabled ? 'Web search enabled' : 'Web search disabled') : 'Upgrade to use web search'"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="webSearchEnabled && canEnableWebSearch ? 'color: var(--color-primary);' : 'color: var(--color-text-tertiary);'">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+              </svg>
+            </button>
+            <button
+              @click="showModelSelectionModal = true"
+              class="flex items-center justify-center p-1 rounded hover:bg-white/5 transition-colors"
+              style="color: var(--color-text-tertiary);"
+              title="Edit model selection"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
+            </button>
+            <div class="flex-1 min-w-0 flex flex-wrap items-center gap-1">
+              <div v-if="parsedSelectedModels.length > 0" class="flex flex-wrap gap-1">
+                <span
+                  v-for="model in parsedSelectedModels"
+                  :key="model.id"
+                  class="text-[9px] font-semibold px-1.5 py-0.5 rounded-md"
+                  style="background: var(--color-primary-muted); color: var(--color-primary);"
+                >
+                  {{ model.name }}
+                </span>
+              </div>
+              <span v-else class="text-[9px] font-medium" style="color: var(--color-text-tertiary);">
+                None
+              </span>
             </div>
-            <p class="text-base font-bold mb-2" style="color: var(--color-text-primary);">
-              Select an AI response to reply
-            </p>
-            <p class="text-sm font-medium" style="color: var(--color-text-tertiary);">
-              You can only continue the conversation from an AI response
-            </p>
+          </div>
+
+          <!-- User message content (greyed out) -->
+          <div class="mb-3 p-4 rounded-lg" style="background: var(--color-background-secondary); border: 1px solid var(--color-border);">
+            <div class="text-sm leading-relaxed break-words whitespace-pre-wrap" style="color: var(--color-text-tertiary); opacity: 0.6;">
+              {{ selectedUserMessage.content }}
+            </div>
+          </div>
+
+          <!-- Resend button -->
+          <div class="flex justify-end">
+            <button
+              @click="handleResend"
+              :disabled="selectedModels.length === 0 || isSending"
+              class="flex items-center gap-2 px-4 py-2 rounded-lg transition-all font-medium text-sm"
+              :style="(selectedModels.length === 0 || isSending)
+                ? 'background: var(--color-border); color: var(--color-text-tertiary); cursor: not-allowed;'
+                : 'background: var(--color-primary); color: white; cursor: pointer;'"
+              :title="isSending ? 'Sending...' : (selectedModels.length > 1 ? `Resend to ${selectedModels.length} models` : 'Resend message')"
+            >
+              <div v-if="isSending" class="loading-spinner-small"></div>
+              <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+                <path d="M21 3v5h-5"/>
+                <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+                <path d="M3 21v-5h5"/>
+              </svg>
+              <span>Resend</span>
+            </button>
           </div>
         </div>
 
@@ -266,7 +325,7 @@
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
 import type { MessageNode, LLMModel, APIKeys, Settings } from '../types';
 import { getEnabledModelsList } from '../types';
-import { User, Bot, GitBranch, AlertTriangle, MessageCircle, X } from 'lucide-vue-next';
+import { User, Bot, GitBranch, AlertTriangle, X } from 'lucide-vue-next';
 import { renderMarkdown, formatTime, getBranchCount } from '../utils/chat';
 import TextHighlightPopover from './TextHighlightPopover.vue';
 import ModelSelectionModal from './ModelSelectionModal.vue';
@@ -291,6 +350,7 @@ interface Emits {
   (e: 'node-select', nodeId: string): void;
   (e: 'branch-from-text', nodeId: string, highlightedText: string, elaborationPrompt: string, models: LLMModel[], webSearchEnabled: boolean): void;
   (e: 'chat-model-changed', models: LLMModel[]): void;
+  (e: 'resend', userNodeId: string, models: LLMModel[], webSearchEnabled: boolean): void;
 }
 
 const props = defineProps<Props>();
@@ -419,6 +479,12 @@ const canSend = computed(() => {
   return props.isNewRootMode || props.path.length === 0 || props.path[props.path.length - 1]?.type === 'ai';
 });
 
+// Get the selected user message when a user message is selected
+const selectedUserMessage = computed(() => {
+  if (!props.selectedNodeId || props.path.length === 0) return null;
+  return props.path.find(msg => msg.id === props.selectedNodeId && msg.type === 'user') || null;
+});
+
 // Scroll to bottom when path changes
 watch(
   () => props.path,
@@ -507,6 +573,13 @@ function handleSend() {
         textareaRef.value.style.height = '44px';
       }
     });
+  }
+}
+
+function handleResend() {
+  if (selectedUserMessage.value && selectedModels.value.length > 0) {
+    const models = selectedModels.value.map(m => JSON.parse(m) as LLMModel);
+    emit('resend', selectedUserMessage.value.id, models, webSearchEnabled.value);
   }
 }
 
