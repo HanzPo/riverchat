@@ -9,6 +9,7 @@ import {
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 import { CacheService } from './cache';
+import { usePostHog } from '../composables/usePostHog';
 
 export interface EncryptedAPIKeys {
   openrouter: string;
@@ -58,6 +59,17 @@ export class AuthService {
       // Cache auth state for faster app startup
       CacheService.cacheAuthState(userCredential.user);
 
+      // Identify user in PostHog
+      const analytics = usePostHog();
+      const profile = existingProfile || await this.getUserProfile(userCredential.user.uid);
+      if (profile) {
+        analytics.identify(userCredential.user.uid, profile);
+        analytics.capture('user_signed_in', {
+          method: 'google',
+          is_new_user: !existingProfile,
+        });
+      }
+
       return userCredential;
     } catch (error: any) {
       console.error('Google sign-in error:', error);
@@ -83,6 +95,13 @@ export class AuthService {
    */
   static async logout(): Promise<void> {
     try {
+      // Track logout event before resetting
+      const analytics = usePostHog();
+      analytics.capture('user_signed_out');
+      
+      // Reset PostHog session
+      analytics.reset();
+      
       // Clear all caches on logout
       CacheService.clearAll();
       await signOut(auth);
@@ -114,10 +133,17 @@ export class AuthService {
    * Listen to authentication state changes
    */
   static onAuthStateChanged(callback: (user: User | null) => void): () => void {
-    return onAuthStateChanged(auth, (user) => {
+    return onAuthStateChanged(auth, async (user) => {
       if (user) {
         // Cache auth state for faster startup next time
         CacheService.cacheAuthState(user);
+        
+        // Identify user in PostHog if not already identified
+        const analytics = usePostHog();
+        const profile = await this.getUserProfile(user.uid);
+        if (profile) {
+          analytics.identify(user.uid, profile);
+        }
       } else {
         // Clear auth cache on sign out
         CacheService.clearAuthState();

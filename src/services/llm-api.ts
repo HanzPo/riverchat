@@ -1,5 +1,6 @@
 import type { LLMModel, APIKeys, MessageNode } from '../types';
 import { SHARED_OPENROUTER_API_KEY } from '../types';
+import { captureException } from '../composables/usePostHog';
 
 interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -104,7 +105,17 @@ export class LLMAPIService {
 
       if (!response.ok) {
         const error = await response.json();
-        onError(error.error?.message || `OpenRouter API error: ${response.status}`);
+        const errorMessage = error.error?.message || `OpenRouter API error: ${response.status}`;
+        
+        // Capture API error
+        captureException(new Error(errorMessage), {
+          context: 'openrouter_api',
+          model: model.id,
+          status: response.status,
+          web_search_enabled: webSearchEnabled,
+        });
+        
+        onError(errorMessage);
         return;
       }
 
@@ -148,7 +159,16 @@ export class LLMAPIService {
 
       onComplete();
     } catch (error) {
-      onError(error instanceof Error ? error.message : 'OpenRouter streaming error');
+      const errorMessage = error instanceof Error ? error.message : 'OpenRouter streaming error';
+      
+      // Capture streaming error
+      captureException(error instanceof Error ? error : new Error(errorMessage), {
+        context: 'openrouter_streaming',
+        model: model.id,
+        web_search_enabled: webSearchEnabled,
+      });
+      
+      onError(errorMessage);
     }
   }
 }

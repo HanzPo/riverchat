@@ -5,6 +5,7 @@ import { getDefaultEnabledModelsRecord, SHARED_OPENROUTER_API_KEY } from '../typ
 import { FirestoreStorageService } from '../services/firestore-storage';
 import { LLMAPIService } from '../services/llm-api';
 import { getAvailableModels, filterModelsByApiKey, sortModels } from '../services/openrouter';
+import { usePostHog, captureException } from './usePostHog';
 
 // Simple debounce utility
 function debounce<T extends (...args: any[]) => any>(
@@ -95,6 +96,14 @@ export function useRiverChat() {
     currentRiver.value = river;
     // Force refresh to ensure new river appears immediately
     await refreshRivers(true);
+    
+    // Track river creation
+    const analytics = usePostHog();
+    analytics.capture('river_created', {
+      river_id: river.id,
+      river_name: name,
+    });
+    
     return river;
   }
 
@@ -103,12 +112,23 @@ export function useRiverChat() {
     if (river) {
       currentRiver.value = river;
       selectedNodeId.value = null;
+      
+      // Track river loaded
+      const analytics = usePostHog();
+      analytics.capture('river_loaded', {
+        river_id: riverId,
+        node_count: Object.keys(river.nodes).length,
+      });
+      
       return true;
     }
     return false;
   }
 
   async function deleteRiver(riverId: string): Promise<void> {
+    const river = await FirestoreStorageService.getRiver(riverId);
+    const nodeCount = river ? Object.keys(river.nodes).length : 0;
+    
     await FirestoreStorageService.deleteRiver(riverId);
     if (currentRiver.value?.id === riverId) {
       currentRiver.value = null;
@@ -116,6 +136,13 @@ export function useRiverChat() {
     }
     // Force refresh to ensure deleted river is removed immediately
     await refreshRivers(true);
+    
+    // Track river deletion
+    const analytics = usePostHog();
+    analytics.capture('river_deleted', {
+      river_id: riverId,
+      node_count: nodeCount,
+    });
   }
 
   async function renameRiver(riverId: string, newName: string): Promise<void> {
@@ -301,6 +328,17 @@ export function useRiverChat() {
     // Update last used model
     settings.value.lastUsedModel = model;
 
+    const analytics = usePostHog();
+    const startTime = Date.now();
+
+    // Track message sent
+    analytics.capture('message_sent', {
+      river_id: currentRiver.value.id,
+      model: model,
+      web_search_enabled: webSearchEnabled,
+      message_length: userNode.content.length,
+    });
+
     await LLMAPIService.streamResponse(
       model,
       userNode,
@@ -322,6 +360,16 @@ export function useRiverChat() {
           const node = currentRiver.value.nodes[aiNode.id];
           if (node) {
             node.state = 'complete';
+            
+            // Track response completed
+            const duration = Date.now() - startTime;
+            analytics.capture('ai_response_completed', {
+              river_id: currentRiver.value.id,
+              model: model,
+              duration_ms: duration,
+              response_length: node.content.length,
+              web_search_enabled: webSearchEnabled,
+            });
           }
         }
       },
@@ -332,6 +380,14 @@ export function useRiverChat() {
           if (node) {
             node.state = 'error';
             node.error = error;
+            
+            // Track error
+            captureException(new Error(error), {
+              context: 'ai_response_generation',
+              river_id: currentRiver.value.id,
+              model: model,
+              web_search_enabled: webSearchEnabled,
+            });
           }
         }
       }
@@ -373,6 +429,16 @@ export function useRiverChat() {
 
     currentRiver.value.nodes[userNode.id] = userNode;
     selectedNodeId.value = userNode.id;
+
+    // Track branch creation
+    const analytics = usePostHog();
+    analytics.capture('branch_created', {
+      river_id: currentRiver.value.id,
+      source_node_id: sourceNodeId,
+      highlighted_text_length: highlightedText.length,
+      prompt_length: userPrompt.length,
+      model: model,
+    });
 
     // Generate AI response for this branch
     await generateAIResponse(userNode.id, model, webSearchEnabled);
@@ -504,6 +570,17 @@ export function useRiverChat() {
     settings.value.apiKeys = apiKeys;
     await FirestoreStorageService.saveAPIKeys(apiKeys);
     hasAPIKeys.value = await FirestoreStorageService.hasAPIKeys();
+    
+    // Track API key configuration
+    const analytics = usePostHog();
+    analytics.capture('api_keys_updated', {
+      has_openrouter: !!apiKeys.openrouter,
+    });
+    
+    // Update user properties
+    analytics.setUserProperties({
+      has_own_api_keys: !!apiKeys.openrouter,
+    });
   }
 
   // Selection

@@ -249,6 +249,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, defineAsyncComponent } from 'vue';
 import { useRiverChat } from './composables/useRiverChat';
+import { usePostHog } from './composables/usePostHog';
 import type { MessageNode, LLMModel } from './types';
 import { Folder, Search, HelpCircle, Settings, Plus, User as UserIcon } from 'lucide-vue-next';
 import { AuthService } from './services/auth';
@@ -357,6 +358,17 @@ watch(currentRiver, (river) => {
     document.title = 'RiverChat | Branching AI Conversations';
   }
 }, { immediate: true });
+
+// Track user properties when they change
+const analytics = usePostHog();
+watch(() => currentRiver.value, (river) => {
+  if (river && currentUser.value) {
+    analytics.setUserProperties({
+      river_count: allRivers.value.length,
+      active_river_node_count: Object.keys(river.nodes).length,
+    });
+  }
+}, { deep: false });
 
 // Resize functionality
 function startResize(e: MouseEvent) {
