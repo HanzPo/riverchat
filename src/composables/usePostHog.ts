@@ -1,18 +1,31 @@
 import posthog from 'posthog-js'
 
-export function usePostHog() {
+let isInitialized = false
+
+export function initPostHog() {
+  if (isInitialized) {
+    return
+  }
+
   const apiKey = import.meta.env.VITE_POSTHOG_KEY
   const apiHost = import.meta.env.VITE_POSTHOG_HOST || 'https://us.i.posthog.com'
 
   if (!apiKey) {
     console.warn('PostHog API key not found. Analytics will not be initialized.')
-    return { posthog: null }
+    return
   }
 
   posthog.init(apiKey, {
     api_host: apiHost,
-    person_profiles: 'identified_only', // or 'always' to create profiles for anonymous users as well
+    person_profiles: 'identified_only',
+    capture_pageview: false, // We'll manually capture pageviews in the router
   })
 
-  return { posthog }
+  isInitialized = true
+}
+
+export function usePostHog() {
+  return {
+    posthog: isInitialized ? posthog : null
+  }
 }

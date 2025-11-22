@@ -16,11 +16,9 @@ const router = createRouter({
   routes,
 })
 
-// Initialize PostHog
-const { posthog } = usePostHog()
-
 // Track page views and route changes
 router.afterEach((to) => {
+  const { posthog } = usePostHog()
   if (posthog) {
     posthog.capture('$pageview', {
       $current_url: to.fullPath,
