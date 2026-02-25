@@ -40,3 +40,7 @@ build/
 Thumbs.db
 .firebaserc
 .claude
+
+# Cloud Functions
+functions/node_modules
+functions/lib

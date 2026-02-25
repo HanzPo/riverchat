@@ -1,4 +1,9 @@
 {
+  "functions": {
+    "source": "functions",
+    "runtime": "nodejs22",
+    "codebase": "default"
+  },
   "hosting": {
     "public": "dist",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],

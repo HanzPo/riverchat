@@ -323,12 +323,13 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
-import type { MessageNode, LLMModel, APIKeys, Settings } from '../types';
+import type { MessageNode, LLMModel, Settings } from '../types';
 import { getEnabledModelsList } from '../types';
 import { User, Bot, GitBranch, AlertTriangle, X } from 'lucide-vue-next';
 import { renderMarkdown, formatTime, getBranchCount } from '../utils/chat';
 import TextHighlightPopover from './TextHighlightPopover.vue';
 import ModelSelectionModal from './ModelSelectionModal.vue';
+import { useSubscription } from '../composables/useSubscription';
 import type { User as FirebaseUser } from 'firebase/auth';
 
 interface Props {
@@ -338,7 +339,6 @@ interface Props {
   lastUsedModel: LLMModel | null;
   isNewRootMode?: boolean;
   allNodes?: Record<string, MessageNode>;
-  apiKeys?: APIKeys;
   settings?: Settings;
   isSending?: boolean;
   currentUser?: FirebaseUser | null;
@@ -363,9 +363,11 @@ const textareaRef = ref<HTMLTextAreaElement | null>(null);
 const showModelSelectionModal = ref(false);
 const webSearchEnabled = ref(false);
 
-// Check if web search can be enabled (user must be logged in AND have an API key)
+const subscription = useSubscription();
+
+// Check if web search can be enabled (based on subscription tier)
 const canEnableWebSearch = computed(() => {
-  return !!props.currentUser && !!props.apiKeys?.openrouter && props.apiKeys.openrouter.trim().length > 0;
+  return !!props.currentUser && subscription.webSearchEnabled.value;
 });
 
 // Text selection and highlight popover state
@@ -384,12 +386,12 @@ const branchContext = ref({
 
 let isSelecting = false;
 
-// Get enabled models from settings
+// Get enabled models from settings + subscription's available models
 const enabledModels = computed(() => {
-  if (!props.settings?.enabledModels || !props.settings?.availableModels) {
+  if (!props.settings?.enabledModels || subscription.availableModels.value.length === 0) {
     return [];
   }
-  return getEnabledModelsList(props.settings.enabledModels, props.settings.availableModels);
+  return getEnabledModelsList(props.settings.enabledModels, subscription.availableModels.value);
 });
 
 // Parse selected models from JSON strings
@@ -418,13 +420,11 @@ watch(
       selectedModels.value = lastSelected.map(m => JSON.stringify(m));
     } else if (selectedModels.value.length === 0) {
       // No previous selection, default to first available model
-      const enabledModels = props.settings?.enabledModels && props.settings?.availableModels
-        ? getEnabledModelsList(props.settings.enabledModels, props.settings.availableModels)
+      const models = props.settings?.enabledModels && subscription.availableModels.value.length > 0
+        ? getEnabledModelsList(props.settings.enabledModels, subscription.availableModels.value)
         : [];
-      if (enabledModels.length > 0) {
-        // Default to first free model, otherwise first model
-        const defaultModel = enabledModels.find(m => m.isFree) || enabledModels[0];
-        selectedModels.value = [JSON.stringify(defaultModel)];
+      if (models.length > 0) {
+        selectedModels.value = [JSON.stringify(models[0])];
       }
     }
     // Use nextTick to reset the flag after the update completes
@@ -439,29 +439,32 @@ watch(
 watch(
   () => props.settings?.enabledModels,
   (enabledModelsRecord) => {
-    if (!enabledModelsRecord || !props.settings?.availableModels) {
+    if (!enabledModelsRecord || subscription.availableModels.value.length === 0) {
       selectedModels.value = [];
       return;
     }
 
-    const enabledModels = getEnabledModelsList(enabledModelsRecord, props.settings.availableModels);
-    if (enabledModels.length === 0) {
+    const models = getEnabledModelsList(enabledModelsRecord, subscription.availableModels.value);
+    if (models.length === 0) {
       selectedModels.value = [];
       return;
     }
 
-    // Get set of currently enabled model strings for fast lookup
-    const enabledModelStrings = new Set(enabledModels.map(m => JSON.stringify(m)));
+    // Get set of currently enabled model IDs for fast lookup
+    const enabledIds = new Set(models.map(m => m.id));
 
     // Filter currently selected models to only include enabled ones
-    const filteredSelection = selectedModels.value.filter(ms => enabledModelStrings.has(ms));
+    const filteredSelection = selectedModels.value.filter(ms => {
+      try {
+        const m = JSON.parse(ms) as LLMModel;
+        return enabledIds.has(m.id);
+      } catch { return false; }
+    });
 
     // If all selected models were removed, default to first enabled model
-    if (filteredSelection.length === 0 && enabledModels.length > 0) {
-      const defaultModel = enabledModels.find(m => m.isFree) || enabledModels[0];
-      selectedModels.value = [JSON.stringify(defaultModel)];
+    if (filteredSelection.length === 0 && models.length > 0) {
+      selectedModels.value = [JSON.stringify(models[0])];
     } else if (filteredSelection.length !== selectedModels.value.length) {
-      // Only update if something actually changed
       selectedModels.value = filteredSelection;
     }
   },

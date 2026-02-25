@@ -117,7 +117,6 @@
           :last-used-model="settings.lastUsedModel"
           :is-new-root-mode="isNewRootMode"
           :all-nodes="currentRiver?.nodes || {}"
-          :api-keys="settings.apiKeys"
           :settings="settings"
           :is-sending="isSendingMessage"
           :current-user="currentUser"
@@ -136,7 +135,6 @@
     <WelcomeModal
       :is-open="showWelcome"
       :can-dismiss="true"
-      @save="handleSaveAPIKeys"
       @close="showWelcome = false"
     />
 
@@ -213,7 +211,6 @@
       :last-used-model="settings.lastUsedModel"
       :is-new-root-mode="isNewRootMode"
       :all-nodes="currentRiver?.nodes || {}"
-      :api-keys="settings.apiKeys"
       :settings="settings"
       :is-sending="isSendingMessage"
       :current-user="currentUser"
@@ -274,8 +271,8 @@ const {
   settings,
   selectedNodeId,
   allRivers,
-  hasAPIKeys,
   isLoading,
+  subscription,
   createRiver,
   loadRiver,
   deleteRiver,
@@ -290,7 +287,6 @@ const {
   updateNodePositionsBatch,
   getPathToNode,
   updateSettings,
-  updateAPIKeys,
   selectNode,
   clearState,
   initialize,
@@ -470,9 +466,30 @@ onMounted(async () => {
     chatPanelWidth.value = parseInt(savedWidth, 10);
   }
 
-  // Show welcome modal only for brand new users (no API keys, no rivers, not logged in)
-  if (!hasAPIKeys.value && !currentUser.value && allRivers.value.length === 0) {
+  // Show welcome modal only for brand new users (no rivers, not logged in)
+  if (!currentUser.value && allRivers.value.length === 0) {
     showWelcome.value = true;
+  }
+
+  // Handle Stripe checkout redirects
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('checkout') === 'success') {
+    showToast('Subscription updated successfully!', 'success');
+    // Refresh balance to reflect new tier
+    subscription.refreshBalance();
+    subscription.refreshModels();
+    // Clean up URL
+    window.history.replaceState({}, '', window.location.pathname);
+  } else if (urlParams.get('checkout') === 'cancel') {
+    showToast('Checkout cancelled', 'info');
+    window.history.replaceState({}, '', window.location.pathname);
+  } else if (urlParams.get('topup') === 'success') {
+    showToast('Credits added successfully!', 'success');
+    subscription.refreshBalance();
+    window.history.replaceState({}, '', window.location.pathname);
+  } else if (urlParams.get('topup') === 'cancel') {
+    showToast('Top-up cancelled', 'info');
+    window.history.replaceState({}, '', window.location.pathname);
   }
 
   // Setup keyboard shortcuts
@@ -522,22 +539,8 @@ async function handleLogout() {
   }
 }
 
-// API Keys Management
-async function handleSaveAPIKeys(apiKeys: typeof settings.value.apiKeys) {
-  await updateAPIKeys(apiKeys);
-  showWelcome.value = false;
-  showToast('API keys saved successfully', 'success');
-}
-
 // Settings Management
 async function handleSaveSettings(newSettings: typeof settings.value) {
-  console.log('[App.vue] handleSaveSettings received:', {
-    hasAPIKeys: !!newSettings.apiKeys.openrouter,
-    apiKeys: {
-      openrouter: newSettings.apiKeys.openrouter ? `${newSettings.apiKeys.openrouter.substring(0, 10)}...` : 'empty'
-    }
-  });
-
   await updateSettings(newSettings);
   showSettings.value = false;
   showToast('Settings saved', 'success');
@@ -691,7 +694,7 @@ async function handleRegenerate(parentNodeId: string) {
   if (!parentNode) return;
 
   // Use the last used model or first available model
-  const model = settings.value.lastUsedModel || settings.value.availableModels?.[0];
+  const model = settings.value.lastUsedModel || subscription.availableModels.value[0];
   if (!model) {
     showToast('No models available', 'error');
     return;
@@ -732,7 +735,7 @@ function confirmEditResubmit() {
     updateNodeContent(nodeId, newContent.trim());
 
     // Generate new response
-    const model = settings.value.lastUsedModel || settings.value.availableModels?.[0];
+    const model = settings.value.lastUsedModel || subscription.availableModels.value[0];
     if (model) {
       generateAIResponse(nodeId, model, false);
       showToast('Message updated, generating new response...', 'info');

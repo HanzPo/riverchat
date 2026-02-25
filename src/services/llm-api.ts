@@ -1,5 +1,5 @@
-import type { LLMModel, APIKeys, MessageNode } from '../types';
-import { SHARED_OPENROUTER_API_KEY } from '../types';
+import type { LLMModel, MessageNode, UsageMetadata } from '../types';
+import { auth } from '../config/firebase';
 import { captureException } from '../composables/usePostHog';
 
 interface ChatMessage {
@@ -7,7 +7,7 @@ interface ChatMessage {
   content: string;
 }
 
-const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
+const STREAM_CHAT_URL = import.meta.env.VITE_STREAM_CHAT_URL || '';
 
 export class LLMAPIService {
   private static buildContext(
@@ -46,19 +46,17 @@ export class LLMAPIService {
     model: LLMModel,
     parentNode: MessageNode,
     allNodes: Record<string, MessageNode>,
-    apiKeys: APIKeys,
     webSearchEnabled: boolean,
     onToken: (token: string) => void,
-    onComplete: () => void,
+    onComplete: (usage?: UsageMetadata) => void,
     onError: (error: string) => void
   ): Promise<void> {
     const context = this.buildContext(parentNode, allNodes);
 
     try {
-      await this.streamOpenRouter(
+      await this.streamViaProxy(
         model,
         context,
-        apiKeys.openrouter || SHARED_OPENROUTER_API_KEY,
         webSearchEnabled,
         onToken,
         onComplete,
@@ -69,52 +67,54 @@ export class LLMAPIService {
     }
   }
 
-  private static async streamOpenRouter(
+  private static async streamViaProxy(
     model: LLMModel,
     messages: ChatMessage[],
-    apiKey: string,
     webSearchEnabled: boolean,
     onToken: (token: string) => void,
-    onComplete: () => void,
+    onComplete: (usage?: UsageMetadata) => void,
     onError: (error: string) => void
   ): Promise<void> {
     try {
-      console.log(`[OpenRouter] Using model: ${model.id}${webSearchEnabled ? ' with web search' : ''}`);
+      // Get Firebase Auth ID token
+      const user = auth.currentUser;
+      if (!user) {
+        onError('Not authenticated. Please sign in.');
+        return;
+      }
+      const idToken = await user.getIdToken();
 
-      const requestBody: any = {
-        model: model.id,
-        messages,
-        stream: true,
-      };
-
-      // Add web search plugin if enabled
-      if (webSearchEnabled) {
-        requestBody.plugins = [{ id: 'web' }];
+      if (!STREAM_CHAT_URL) {
+        onError('Chat service URL not configured');
+        return;
       }
 
-      const response = await fetch(OPENROUTER_API_URL, {
+      console.log(`[LLM] Streaming via proxy: ${model.id}${webSearchEnabled ? ' with web search' : ''}`);
+
+      const response = await fetch(STREAM_CHAT_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-          'HTTP-Referer': window.location.origin,
-          'X-Title': 'RiverChat',
+          'Authorization': `Bearer ${idToken}`,
         },
-        body: JSON.stringify(requestBody),
+        body: JSON.stringify({
+          model: model.id,
+          messages,
+          webSearch: webSearchEnabled,
+        }),
       });
 
       if (!response.ok) {
         const error = await response.json();
-        const errorMessage = error.error?.message || `OpenRouter API error: ${response.status}`;
-        
-        // Capture API error
+        const errorMessage = error.error || `API error: ${response.status}`;
+
         captureException(new Error(errorMessage), {
-          context: 'openrouter_api',
+          context: 'proxy_api',
           model: model.id,
           status: response.status,
           web_search_enabled: webSearchEnabled,
         });
-        
+
         onError(errorMessage);
         return;
       }
@@ -127,6 +127,7 @@ export class LLMAPIService {
 
       const decoder = new TextDecoder();
       let buffer = '';
+      let usageData: UsageMetadata | undefined;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -140,12 +141,30 @@ export class LLMAPIService {
           if (line.startsWith('data: ')) {
             const data = line.slice(6);
             if (data === '[DONE]') {
-              onComplete();
-              return;
+              continue;
             }
 
             try {
               const parsed = JSON.parse(data);
+
+              // Check for usage metadata (sent by our proxy after stream)
+              if (parsed.type === 'usage') {
+                usageData = {
+                  cost: parsed.cost,
+                  promptTokens: parsed.promptTokens,
+                  completionTokens: parsed.completionTokens,
+                  balanceAfter: parsed.balanceAfter,
+                };
+                continue;
+              }
+
+              // Check for error
+              if (parsed.error) {
+                onError(parsed.error);
+                return;
+              }
+
+              // Standard OpenRouter SSE token
               const token = parsed.choices?.[0]?.delta?.content;
               if (token) {
                 onToken(token);
@@ -157,17 +176,16 @@ export class LLMAPIService {
         }
       }
 
-      onComplete();
+      onComplete(usageData);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'OpenRouter streaming error';
-      
-      // Capture streaming error
+      const errorMessage = error instanceof Error ? error.message : 'Streaming error';
+
       captureException(error instanceof Error ? error : new Error(errorMessage), {
-        context: 'openrouter_streaming',
+        context: 'proxy_streaming',
         model: model.id,
         web_search_enabled: webSearchEnabled,
       });
-      
+
       onError(errorMessage);
     }
   }

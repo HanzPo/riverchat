@@ -1,10 +1,11 @@
 import { ref, computed, watch } from 'vue';
 import { v4 as uuidv4 } from 'uuid';
-import type { River, MessageNode, LLMModel, Settings, APIKeys } from '../types';
-import { getDefaultEnabledModelsRecord, SHARED_OPENROUTER_API_KEY } from '../types';
+import type { River, MessageNode, LLMModel, Settings } from '../types';
+import { getDefaultEnabledModelsRecord } from '../types';
 import { FirestoreStorageService } from '../services/firestore-storage';
 import { LLMAPIService } from '../services/llm-api';
-import { getAvailableModels, filterModelsByApiKey, sortModels } from '../services/openrouter';
+import { sortModels } from '../services/openrouter';
+import { useSubscription } from './useSubscription';
 import { usePostHog, captureException } from './usePostHog';
 
 // Simple debounce utility
@@ -29,15 +30,16 @@ function debounce<T extends (...args: any[]) => any>(
 
 // Global state
 const currentRiver = ref<River | null>(null);
-const settings = ref<Settings>({ apiKeys: { openrouter: '' }, lastUsedModel: null, enabledModels: {}, lastChatSelectedModels: [], availableModels: [] });
+const settings = ref<Settings>({ lastUsedModel: null, enabledModels: {}, lastChatSelectedModels: [], lastModelRefresh: undefined });
 const selectedNodeId = ref<string | null>(null);
 const allRivers = ref<River[]>([]);
-const hasAPIKeys = ref(false);
 const isLoading = ref(false);
 const isInitializing = ref(true); // Flag to prevent auto-save during initial load
 const isSavingImmediately = ref(false); // Flag to skip debounced watcher during immediate saves
 
 export function useRiverChat() {
+  const subscription = useSubscription();
+
   const selectedNode = computed(() => {
     if (!currentRiver.value || !selectedNodeId.value) return null;
     return currentRiver.value.nodes[selectedNodeId.value] || null;
@@ -52,7 +54,6 @@ export function useRiverChat() {
   const debouncedSaveSettings = debounce(async (newSettings: Settings) => {
     console.log('[useRiverChat] Auto-saving settings to Firestore (debounced)');
     await FirestoreStorageService.saveSettings(newSettings);
-    hasAPIKeys.value = await FirestoreStorageService.hasAPIKeys();
   }, 2000); // Save at most once per 2 seconds
 
   // Save current river whenever it changes (debounced)
@@ -96,14 +97,14 @@ export function useRiverChat() {
     currentRiver.value = river;
     // Force refresh to ensure new river appears immediately
     await refreshRivers(true);
-    
+
     // Track river creation
     const analytics = usePostHog();
     analytics.capture('river_created', {
       river_id: river.id,
       river_name: name,
     });
-    
+
     return river;
   }
 
@@ -112,14 +113,14 @@ export function useRiverChat() {
     if (river) {
       currentRiver.value = river;
       selectedNodeId.value = null;
-      
+
       // Track river loaded
       const analytics = usePostHog();
       analytics.capture('river_loaded', {
         river_id: riverId,
         node_count: Object.keys(river.nodes).length,
       });
-      
+
       return true;
     }
     return false;
@@ -128,7 +129,7 @@ export function useRiverChat() {
   async function deleteRiver(riverId: string): Promise<void> {
     const river = await FirestoreStorageService.getRiver(riverId);
     const nodeCount = river ? Object.keys(river.nodes).length : 0;
-    
+
     await FirestoreStorageService.deleteRiver(riverId);
     if (currentRiver.value?.id === riverId) {
       currentRiver.value = null;
@@ -136,7 +137,7 @@ export function useRiverChat() {
     }
     // Force refresh to ensure deleted river is removed immediately
     await refreshRivers(true);
-    
+
     // Track river deletion
     const analytics = usePostHog();
     analytics.capture('river_deleted', {
@@ -337,13 +338,13 @@ export function useRiverChat() {
       model: model,
       web_search_enabled: webSearchEnabled,
       message_length: userNode.content.length,
+      tier: subscription.tier.value,
     });
 
     await LLMAPIService.streamResponse(
       model,
       userNode,
       currentRiver.value.nodes,
-      settings.value.apiKeys,
       webSearchEnabled,
       (token: string) => {
         // On token received
@@ -354,13 +355,18 @@ export function useRiverChat() {
           }
         }
       },
-      () => {
+      (usage) => {
         // On complete
         if (currentRiver.value) {
           const node = currentRiver.value.nodes[aiNode.id];
           if (node) {
             node.state = 'complete';
-            
+
+            // Apply usage update to local balance
+            if (usage) {
+              subscription.applyUsageUpdate(usage);
+            }
+
             // Track response completed
             const duration = Date.now() - startTime;
             analytics.capture('ai_response_completed', {
@@ -369,6 +375,7 @@ export function useRiverChat() {
               duration_ms: duration,
               response_length: node.content.length,
               web_search_enabled: webSearchEnabled,
+              cost_cents: usage?.cost,
             });
           }
         }
@@ -380,7 +387,11 @@ export function useRiverChat() {
           if (node) {
             node.state = 'error';
             node.error = error;
-            
+
+            // Re-sync balance from server since the proxy may have
+            // reconciled a partial reservation without sending a usage event
+            subscription.refreshBalance();
+
             // Track error
             captureException(new Error(error), {
               context: 'ai_response_generation',
@@ -532,15 +543,6 @@ export function useRiverChat() {
 
   // Settings Management
   async function updateSettings(newSettings: Partial<Settings>, immediate: boolean = false): Promise<void> {
-    console.log('[useRiverChat] updateSettings called with:', {
-      hasAPIKeys: !!newSettings.apiKeys?.openrouter,
-      apiKeys: newSettings.apiKeys ? {
-        openrouter: newSettings.apiKeys.openrouter ? `${newSettings.apiKeys.openrouter.substring(0, 10)}...` : 'empty'
-      } : 'no apiKeys property',
-      immediate,
-      newSettings
-    });
-
     // Set flag to skip debounced watcher if this is an immediate save
     // Must be set BEFORE updating settings.value to ensure watcher sees it
     if (immediate) {
@@ -551,36 +553,15 @@ export function useRiverChat() {
     const mergedSettings = { ...settings.value, ...newSettings };
     settings.value = mergedSettings;
 
-    console.log('[useRiverChat] After merge, settings.value.apiKeys:', {
-      openrouter: settings.value.apiKeys.openrouter ? `${settings.value.apiKeys.openrouter.substring(0, 10)}...` : 'empty'
-    });
-
     // Save immediately (bypasses debounced watcher)
     await FirestoreStorageService.saveSettings(mergedSettings);
-    
+
     // Reset flag after save completes
     if (immediate) {
       // Small delay to ensure watcher has processed the skip
       await new Promise(resolve => setTimeout(resolve, 10));
       isSavingImmediately.value = false;
     }
-  }
-
-  async function updateAPIKeys(apiKeys: APIKeys): Promise<void> {
-    settings.value.apiKeys = apiKeys;
-    await FirestoreStorageService.saveAPIKeys(apiKeys);
-    hasAPIKeys.value = await FirestoreStorageService.hasAPIKeys();
-    
-    // Track API key configuration
-    const analytics = usePostHog();
-    analytics.capture('api_keys_updated', {
-      has_openrouter: !!apiKeys.openrouter,
-    });
-    
-    // Update user properties
-    analytics.setUserProperties({
-      has_own_api_keys: !!apiKeys.openrouter,
-    });
   }
 
   // Selection
@@ -594,7 +575,7 @@ export function useRiverChat() {
     selectedNodeId.value = null;
   }
 
-  // Initialize - optimized with caching
+  // Initialize - load data and subscription state
   async function initialize(forceRefresh: boolean = false): Promise<void> {
     isLoading.value = true;
     isInitializing.value = true; // Prevent auto-save during load
@@ -604,35 +585,20 @@ export function useRiverChat() {
       settings.value = await FirestoreStorageService.getSettings(!forceRefresh);
       console.log('[useRiverChat] Settings loaded successfully');
 
-      // Check API keys
-      hasAPIKeys.value = await FirestoreStorageService.hasAPIKeys();
+      // Load subscription balance and models from server
+      await Promise.all([
+        subscription.refreshBalance(),
+        subscription.refreshModels(),
+      ]);
 
-      // Use cached models if available, fetch only on first initialization
-      if (settings.value.availableModels && settings.value.availableModels.length > 0) {
-        console.log(`[useRiverChat] Using ${settings.value.availableModels.length} cached models`);
-      } else {
-        // First time user - fetch models once
-        console.log('[useRiverChat] No cached models found. Fetching models for first-time initialization...');
-        try {
-          const allModels = await getAvailableModels();
-          const apiKey = settings.value.apiKeys.openrouter || SHARED_OPENROUTER_API_KEY;
-          const filteredModels = filterModelsByApiKey(allModels, apiKey);
-          const sortedModels = sortModels(filteredModels);
-
-          settings.value.availableModels = sortedModels;
-          settings.value.lastModelRefresh = Date.now();
-
-          // Enable default models
-          if (!settings.value.enabledModels || Object.keys(settings.value.enabledModels).length === 0) {
-            settings.value.enabledModels = getDefaultEnabledModelsRecord(sortedModels);
-          }
-
+      // If models loaded, set up default enabled models if needed
+      if (subscription.availableModels.value.length > 0) {
+        const sorted = sortModels([...subscription.availableModels.value]);
+        if (!settings.value.enabledModels || Object.keys(settings.value.enabledModels).length === 0) {
+          settings.value.enabledModels = getDefaultEnabledModelsRecord(sorted);
           await FirestoreStorageService.saveSettings(settings.value);
-          console.log(`[useRiverChat] Fetched and cached ${sortedModels.length} models for first-time use`);
-        } catch (error) {
-          console.error('[useRiverChat] Failed to fetch models:', error);
-          console.log('[useRiverChat] Please refresh model list from Settings > Data.');
         }
+        settings.value.lastModelRefresh = Date.now();
       }
 
       // Load rivers
@@ -658,8 +624,8 @@ export function useRiverChat() {
     settings,
     selectedNodeId,
     allRivers,
-    hasAPIKeys,
     isLoading,
+    subscription,
 
     // Computed
     selectedNode,
@@ -684,7 +650,6 @@ export function useRiverChat() {
 
     // Settings methods
     updateSettings,
-    updateAPIKeys,
 
     // Selection methods
     selectNode,
