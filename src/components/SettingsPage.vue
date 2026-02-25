@@ -672,6 +672,7 @@ function handleBack() {
   border-top-color: var(--color-primary);
   border-radius: 50%;
   animation: spin 0.6s linear infinite;
+  flex-shrink: 0;
 }
 
 .animate-spin {

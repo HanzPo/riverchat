@@ -2,7 +2,7 @@
   <div
     class="card-material p-3.5 min-w-[280px] max-w-[320px] cursor-pointer transition-all duration-300 ease-material hover:-translate-y-0.5 hover:shadow-elevation-3"
     :class="{
-      'animate-pulse opacity-70': data.state === 'generating',
+      'generating-node': data.state === 'generating',
       'border-error border-2': data.state === 'error',
       'selected-node': selected,
       'bg-primary/20 border-primary/30': data.type === 'user',
@@ -129,6 +129,21 @@ function handleContextMenu(event: MouseEvent) {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* Generating node - subtle border glow instead of opacity pulse to prevent visual movement */
+.generating-node {
+  border-color: var(--color-primary) !important;
+  animation: generating-glow 2s ease-in-out infinite;
+}
+
+@keyframes generating-glow {
+  0%, 100% {
+    box-shadow: 0 0 4px rgba(13, 153, 255, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 12px rgba(13, 153, 255, 0.4);
+  }
 }
 
 /* Selected node styling - prominent outline with consistent border width */

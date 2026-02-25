@@ -23,7 +23,8 @@
           <button
             @click="handleCreateRiver"
             :disabled="!newRiverName.trim() || isLoading"
-            class="btn-material px-5 py-2.5 whitespace-nowrap flex items-center gap-3"
+            class="btn-material px-5 py-2.5 whitespace-nowrap flex items-center justify-center gap-3"
+            style="min-width: 140px;"
           >
             <div v-if="isLoading" class="loading-spinner-small"></div>
             <span>{{ isLoading ? 'Creating...' : '+ New River' }}</span>
@@ -238,6 +239,7 @@ function getNodeCount(river: River): number {
   border-top-color: white;
   border-radius: 50%;
   animation: spin 0.6s linear infinite;
+  flex-shrink: 0;
 }
 
 @keyframes spin {
