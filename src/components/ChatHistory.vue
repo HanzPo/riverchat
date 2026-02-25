@@ -140,8 +140,8 @@
     <div class="p-4 card-material">
       <!-- Resend interface when user node is selected -->
       <div v-if="!canSend && !isNewRootMode && path.length > 0 && selectedUserMessage" class="py-3">
-        <!-- Model Selection Summary (Compact) -->
-        <div class="mb-2 flex items-center gap-2">
+        <!-- Model Selection (Dropdowns) -->
+        <div class="mb-2 flex items-center gap-1.5 flex-wrap">
           <button
             @click="canEnableWebSearch ? webSearchEnabled = !webSearchEnabled : null"
             class="flex items-center justify-center rounded-lg transition-all"
@@ -154,32 +154,31 @@
               <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
             </svg>
           </button>
-          <button
-            @click="showModelSelectionModal = true"
-            class="flex items-center justify-center p-1 rounded hover:bg-white/5 transition-colors"
-            style="color: var(--color-text-tertiary);"
-            title="Edit model selection"
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-            </svg>
-          </button>
-          <div class="flex-1 min-w-0 flex flex-wrap items-center gap-1">
-            <div v-if="parsedSelectedModels.length > 0" class="flex flex-wrap gap-1">
-              <span
-                v-for="model in parsedSelectedModels"
-                :key="model.id"
-                class="text-[9px] font-semibold px-1.5 py-0.5 rounded"
-                style="background: var(--color-primary-muted); color: var(--color-primary);"
-              >
-                {{ model.name }}
-              </span>
-            </div>
-            <span v-else class="text-[9px] font-medium" style="color: var(--color-text-tertiary);">
-              None
-            </span>
+          <div v-for="(modelId, index) in selectedModelIds" :key="index" class="flex items-center gap-0.5">
+            <ModelDropdown
+              :selected-model-id="modelId"
+              :available-models="subscription.availableModels.value"
+              @select="(id: string) => handleModelSelect(index, id)"
+            />
+            <button
+              v-if="selectedModelIds.length > 1"
+              @click="removeModelSlot(index)"
+              class="p-0.5 rounded hover:bg-white/10 transition-colors"
+              style="color: var(--color-text-tertiary);"
+              title="Remove model"
+            >
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
           </div>
+          <button
+            v-if="selectedModelIds.length < subscription.maxModelsPerPrompt.value"
+            @click="addModelSlot"
+            class="flex items-center justify-center w-6 h-6 rounded-md hover:bg-white/10 transition-colors"
+            style="color: var(--color-text-tertiary); border: 1px dashed var(--color-border);"
+            title="Add model"
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
         </div>
 
         <!-- User message content (greyed out) -->
@@ -193,12 +192,12 @@
         <div class="flex justify-end">
           <button
             @click="handleResend"
-            :disabled="selectedModels.length === 0 || isSending"
+            :disabled="selectedModelIds.length === 0 || isSending"
             class="flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all font-medium text-xs"
-            :style="(selectedModels.length === 0 || isSending)
+            :style="(selectedModelIds.length === 0 || isSending)
               ? 'background: var(--color-border); color: var(--color-text-tertiary); cursor: not-allowed;'
               : 'background: var(--color-primary); color: white; cursor: pointer;'"
-            :title="isSending ? 'Sending...' : (selectedModels.length > 1 ? `Resend to ${selectedModels.length} models` : 'Resend message')"
+            :title="isSending ? 'Sending...' : (selectedModelIds.length > 1 ? `Resend to ${selectedModelIds.length} models` : 'Resend message')"
           >
             <div v-if="isSending" class="loading-spinner-small"></div>
             <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -234,8 +233,8 @@
           </div>
         </div>
 
-         <!-- Model Selection Summary (Compact) -->
-         <div class="mb-2 flex items-center gap-2">
+         <!-- Model Selection (Dropdowns) -->
+         <div class="mb-2 flex items-center gap-1.5 flex-wrap">
            <button
              @click="canEnableWebSearch ? webSearchEnabled = !webSearchEnabled : null"
              class="flex items-center justify-center rounded-lg transition-all"
@@ -248,32 +247,31 @@
                <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
              </svg>
            </button>
-           <button
-             @click="showModelSelectionModal = true"
-             class="flex items-center justify-center p-1 rounded hover:bg-white/5 transition-colors"
-             style="color: var(--color-text-tertiary);"
-             title="Edit model selection"
-           >
-             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-               <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-             </svg>
-           </button>
-           <div class="flex-1 min-w-0 flex flex-wrap items-center gap-1">
-             <div v-if="parsedSelectedModels.length > 0" class="flex flex-wrap gap-1">
-               <span
-                 v-for="model in parsedSelectedModels"
-                 :key="model.id"
-                 class="text-[9px] font-semibold px-1.5 py-0.5 rounded"
-                 style="background: var(--color-primary-muted); color: var(--color-primary);"
-               >
-                 {{ model.name }}
-               </span>
-             </div>
-             <span v-else class="text-[9px] font-medium" style="color: var(--color-text-tertiary);">
-               None
-             </span>
+           <div v-for="(modelId, index) in selectedModelIds" :key="index" class="flex items-center gap-0.5">
+             <ModelDropdown
+               :selected-model-id="modelId"
+               :available-models="subscription.availableModels.value"
+               @select="(id: string) => handleModelSelect(index, id)"
+             />
+             <button
+               v-if="selectedModelIds.length > 1"
+               @click="removeModelSlot(index)"
+               class="p-0.5 rounded hover:bg-white/10 transition-colors"
+               style="color: var(--color-text-tertiary);"
+               title="Remove model"
+             >
+               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+             </button>
            </div>
+           <button
+             v-if="selectedModelIds.length < subscription.maxModelsPerPrompt.value"
+             @click="addModelSlot"
+             class="flex items-center justify-center w-6 h-6 rounded-md hover:bg-white/10 transition-colors"
+             style="color: var(--color-text-tertiary); border: 1px dashed var(--color-border);"
+             title="Add model"
+           >
+             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+           </button>
          </div>
 
          <div class="flex items-end gap-2">
@@ -290,12 +288,12 @@
 
            <button
              @click="handleSend"
-             :disabled="!inputText.trim() || !canSend || selectedModels.length === 0 || isSending"
+             :disabled="!inputText.trim() || !canSend || selectedModelIds.length === 0 || isSending"
              class="flex items-center justify-center rounded-lg transition-all"
-             :style="(!inputText.trim() || !canSend || selectedModels.length === 0 || isSending) 
+             :style="(!inputText.trim() || !canSend || selectedModelIds.length === 0 || isSending)
                ? 'width: 40px; height: 40px; background: var(--color-border); cursor: not-allowed;'
                : 'width: 40px; height: 40px; background: var(--color-primary); cursor: pointer;'"
-             :title="isSending ? 'Sending...' : (selectedModels.length > 1 ? `Send to ${selectedModels.length} models` : 'Send message')"
+             :title="isSending ? 'Sending...' : (selectedModelIds.length > 1 ? `Send to ${selectedModelIds.length} models` : 'Send message')"
            >
              <div v-if="isSending" class="loading-spinner-small"></div>
              <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: white;">
@@ -306,32 +304,23 @@
       </div>
     </div>
 
-    <!-- Model Selection Modal -->
-    <ModelSelectionModal
-      :is-open="showModelSelectionModal"
-      :enabled-models="enabledModels"
-      :initial-selected-models="parsedSelectedModels"
-      @confirm="handleModelSelectionConfirm"
-      @close="showModelSelectionModal = false"
-    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
 import type { MessageNode, LLMModel, Settings } from '../types';
-import { getEnabledModelsList } from '../types';
+import { resolveModelIds, DEFAULT_MODEL_ID } from '../types';
 import { User, Bot, GitBranch, AlertTriangle, X } from 'lucide-vue-next';
 import { renderMarkdown, formatTime, getBranchCount } from '../utils/chat';
 import TextHighlightPopover from './TextHighlightPopover.vue';
-import ModelSelectionModal from './ModelSelectionModal.vue';
+import ModelDropdown from './ModelDropdown.vue';
 import { useSubscription } from '../composables/useSubscription';
 import type { User as FirebaseUser } from 'firebase/auth';
 
 interface Props {
   path: MessageNode[];
   selectedNodeId: string | null;
-  lastUsedModel: LLMModel | null;
   isNewRootMode?: boolean;
   allNodes?: Record<string, MessageNode>;
   settings?: Settings;
@@ -343,7 +332,7 @@ interface Emits {
   (e: 'send', content: string, models: LLMModel[], webSearchEnabled: boolean): void;
   (e: 'node-select', nodeId: string): void;
   (e: 'branch-from-text', nodeId: string, highlightedText: string, elaborationPrompt: string, models: LLMModel[], webSearchEnabled: boolean): void;
-  (e: 'chat-model-changed', models: LLMModel[]): void;
+  (e: 'chat-model-changed', modelIds: string[]): void;
   (e: 'close'): void;
   (e: 'pop-out'): void;
   (e: 'resend', userNodeId: string, models: LLMModel[], webSearchEnabled: boolean): void;
@@ -353,10 +342,9 @@ const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
 const inputText = ref('');
-const selectedModels = ref<string[]>([]);
+const selectedModelIds = ref<string[]>([]);
 const messagesContainer = ref<HTMLElement | null>(null);
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
-const showModelSelectionModal = ref(false);
 const webSearchEnabled = ref(false);
 
 const subscription = useSubscription();
@@ -381,91 +369,29 @@ const branchContext = ref({
 });
 
 let isSelecting = false;
+let isInitializing = true;
 
-// Get enabled models from settings + subscription's available models
-const enabledModels = computed(() => {
-  if (!props.settings?.enabledModels || subscription.availableModels.value.length === 0) {
-    return [];
+// Initialize from settings
+watch(
+  () => props.settings?.selectedModelIds,
+  (ids) => {
+    if (ids && ids.length > 0) {
+      selectedModelIds.value = [...ids];
+    } else if (selectedModelIds.value.length === 0 && subscription.availableModels.value.length > 0) {
+      const defaultModel = subscription.availableModels.value.find(m => m.id === DEFAULT_MODEL_ID);
+      selectedModelIds.value = [defaultModel?.id ?? subscription.availableModels.value[0]!.id];
+    }
+    nextTick(() => { isInitializing = false; });
+  },
+  { immediate: true }
+);
+
+// Sync model changes back to parent
+watch(selectedModelIds, (ids) => {
+  if (!isInitializing && ids.length > 0) {
+    emit('chat-model-changed', ids);
   }
-  return getEnabledModelsList(props.settings.enabledModels, subscription.availableModels.value);
-});
-
-// Parse selected models from JSON strings
-const parsedSelectedModels = computed(() => {
-  return selectedModels.value
-    .map(jsonStr => {
-      try {
-        return JSON.parse(jsonStr) as LLMModel;
-      } catch {
-        return null;
-      }
-    })
-    .filter((m): m is LLMModel => m !== null);
-});
-
-// Track if we're currently restoring from saved state to prevent loops
-const isRestoringSelection = ref(false);
-
-// Initialize from lastChatSelectedModels (persists across prompts)
-watch(
-  () => props.settings?.lastChatSelectedModels,
-  (lastSelected) => {
-    isRestoringSelection.value = true;
-    if (lastSelected && lastSelected.length > 0) {
-      // Restore last selected models from previous session
-      selectedModels.value = lastSelected.map(m => JSON.stringify(m));
-    } else if (selectedModels.value.length === 0) {
-      // No previous selection, default to first available model
-      const models = props.settings?.enabledModels && subscription.availableModels.value.length > 0
-        ? getEnabledModelsList(props.settings.enabledModels, subscription.availableModels.value)
-        : [];
-      if (models.length > 0) {
-        selectedModels.value = [JSON.stringify(models[0])];
-      }
-    }
-    // Use nextTick to reset the flag after the update completes
-    nextTick(() => {
-      isRestoringSelection.value = false;
-    });
-  },
-  { immediate: true, deep: true }
-);
-
-// Watch for changes in enabled models and filter out models that are no longer available
-watch(
-  () => props.settings?.enabledModels,
-  (enabledModelsRecord) => {
-    if (!enabledModelsRecord || subscription.availableModels.value.length === 0) {
-      selectedModels.value = [];
-      return;
-    }
-
-    const models = getEnabledModelsList(enabledModelsRecord, subscription.availableModels.value);
-    if (models.length === 0) {
-      selectedModels.value = [];
-      return;
-    }
-
-    // Get set of currently enabled model IDs for fast lookup
-    const enabledIds = new Set(models.map(m => m.id));
-
-    // Filter currently selected models to only include enabled ones
-    const filteredSelection = selectedModels.value.filter(ms => {
-      try {
-        const m = JSON.parse(ms) as LLMModel;
-        return enabledIds.has(m.id);
-      } catch { return false; }
-    });
-
-    // If all selected models were removed, default to first enabled model
-    if (filteredSelection.length === 0 && models.length > 0) {
-      selectedModels.value = [JSON.stringify(models[0])];
-    } else if (filteredSelection.length !== selectedModels.value.length) {
-      selectedModels.value = filteredSelection;
-    }
-  },
-  { deep: true }
-);
+}, { deep: true });
 
 // Watch for changes in canEnableWebSearch and disable web search if conditions are no longer met
 watch(canEnableWebSearch, (canEnable) => {
@@ -474,15 +400,27 @@ watch(canEnableWebSearch, (canEnable) => {
   }
 });
 
-// Watch for model changes and persist to lastChatSelectedModels (persists across prompts)
-// Only emit if not currently restoring to prevent infinite loops
-watch(selectedModels, (newModels) => {
-  if (!isRestoringSelection.value && newModels && newModels.length > 0) {
-    const models = newModels.map(m => JSON.parse(m) as LLMModel);
-    // Emit to save to lastChatSelectedModels
-    emit('chat-model-changed', models);
+function handleModelSelect(index: number, modelId: string) {
+  const newIds = [...selectedModelIds.value];
+  newIds[index] = modelId;
+  selectedModelIds.value = newIds;
+}
+
+function addModelSlot() {
+  if (selectedModelIds.value.length < subscription.maxModelsPerPrompt.value) {
+    const usedIds = new Set(selectedModelIds.value);
+    const nextModel = subscription.availableModels.value.find(m => !usedIds.has(m.id) && subscription.canAccessModel(m));
+    if (nextModel) {
+      selectedModelIds.value = [...selectedModelIds.value, nextModel.id];
+    }
   }
-});
+}
+
+function removeModelSlot(index: number) {
+  if (selectedModelIds.value.length > 1) {
+    selectedModelIds.value = selectedModelIds.value.filter((_, i) => i !== index);
+  }
+}
 
 const canSend = computed(() => {
   return props.isNewRootMode || props.path.length === 0 || props.path[props.path.length - 1]?.type === 'ai';
@@ -556,28 +494,20 @@ function handleKeydown(event: KeyboardEvent) {
   }
 }
 
-function handleModelSelectionConfirm(models: LLMModel[]) {
-  // Convert models to JSON strings for selectedModels
-  selectedModels.value = models.map(m => JSON.stringify(m));
-  showModelSelectionModal.value = false;
-}
-
 function handleSend() {
-  if (inputText.value.trim() && selectedModels.value.length > 0 && canSend.value) {
-    const models = selectedModels.value.map(m => JSON.parse(m) as LLMModel);
+  if (inputText.value.trim() && selectedModelIds.value.length > 0 && canSend.value) {
+    const models = resolveModelIds(selectedModelIds.value, subscription.availableModels.value);
+    if (models.length === 0) return;
 
     // Check if we have branch context
     if (branchContext.value.text && branchContext.value.sourceNodeId) {
-      // Send as a branch with context
       emit('branch-from-text', branchContext.value.sourceNodeId, branchContext.value.text, inputText.value.trim(), models, webSearchEnabled.value);
       clearBranchContext();
     } else {
-      // Regular message
       emit('send', inputText.value.trim(), models, webSearchEnabled.value);
     }
 
     inputText.value = '';
-    // Reset textarea height after sending
     nextTick(() => {
       if (textareaRef.value) {
         textareaRef.value.style.height = '40px';
@@ -587,8 +517,9 @@ function handleSend() {
 }
 
 function handleResend() {
-  if (selectedUserMessage.value && selectedModels.value.length > 0) {
-    const models = selectedModels.value.map(m => JSON.parse(m) as LLMModel);
+  if (selectedUserMessage.value && selectedModelIds.value.length > 0) {
+    const models = resolveModelIds(selectedModelIds.value, subscription.availableModels.value);
+    if (models.length === 0) return;
     emit('resend', selectedUserMessage.value.id, models, webSearchEnabled.value);
   }
 }

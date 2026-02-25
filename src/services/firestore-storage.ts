@@ -16,9 +16,8 @@ import type { River, Settings, RiverChatData } from '../types';
 const STORAGE_KEY = 'riverchat_data';
 
 const DEFAULT_SETTINGS: Settings = {
-  lastUsedModel: null,
-  enabledModels: {},
-  lastChatSelectedModels: [],
+  lastUsedModelId: null,
+  selectedModelIds: [],
   lastModelRefresh: undefined,
 };
 
@@ -142,15 +141,10 @@ export class FirestoreStorageService {
       if (settingsSnap.exists()) {
         const data = settingsSnap.data();
 
-        let enabledModels: Record<string, boolean> = {};
-        if (data.enabledModels && typeof data.enabledModels === 'object') {
-          enabledModels = data.enabledModels;
-        }
-
+        // Migrate from old format if needed
         const settings: Settings = {
-          lastUsedModel: data.lastUsedModel || null,
-          enabledModels,
-          lastChatSelectedModels: data.lastChatSelectedModels || [],
+          lastUsedModelId: data.lastUsedModelId || data.lastUsedModel?.id || null,
+          selectedModelIds: data.selectedModelIds || (data.lastChatSelectedModels?.map((m: { id: string }) => m.id)) || [],
           lastModelRefresh: data.lastModelRefresh,
         };
 
@@ -176,9 +170,8 @@ export class FirestoreStorageService {
     try {
       const settingsRef = doc(db, 'users', user.uid, 'settings', 'preferences');
       await setDoc(settingsRef, {
-        lastUsedModel: settings.lastUsedModel,
-        enabledModels: settings.enabledModels || {},
-        lastChatSelectedModels: settings.lastChatSelectedModels || [],
+        lastUsedModelId: settings.lastUsedModelId,
+        selectedModelIds: settings.selectedModelIds || [],
         lastModelRefresh: settings.lastModelRefresh,
         updatedAt: serverTimestamp(),
       });
@@ -274,10 +267,13 @@ export class FirestoreStorageService {
 
   private static getLocalSettings(): Settings {
     const data = this.getLocalData();
-    const settings = data.settings || DEFAULT_SETTINGS;
-    if (!settings.enabledModels) settings.enabledModels = {};
-    if (!settings.lastChatSelectedModels) settings.lastChatSelectedModels = [];
-    return settings;
+    const raw = data.settings || DEFAULT_SETTINGS;
+    // Migrate from old format if needed
+    return {
+      lastUsedModelId: raw.lastUsedModelId || (raw as any).lastUsedModel?.id || null,
+      selectedModelIds: raw.selectedModelIds || ((raw as any).lastChatSelectedModels?.map((m: { id: string }) => m.id)) || [],
+      lastModelRefresh: raw.lastModelRefresh,
+    };
   }
 
   private static saveLocalSettings(settings: Settings): void {

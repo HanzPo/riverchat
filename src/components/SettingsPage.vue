@@ -181,135 +181,45 @@
         </div>
       </div>
 
-      <!-- Models Tab -->
-      <div v-if="activeTab === 'models'" class="flex-1 flex flex-col overflow-hidden">
-        <div class="flex-1 overflow-y-auto p-8">
-          <!-- Filters -->
-          <div class="mb-6 rounded-lg" style="background: var(--color-background); border: 1px solid var(--color-border);">
-            <div class="p-4 border-b flex items-center justify-between" style="border-color: var(--color-border);">
-              <div class="flex items-center gap-2">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--color-primary);">
-                  <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
-                </svg>
-                <h3 class="text-sm font-bold" style="color: var(--color-text-primary);">
-                  Filters & Search
-                </h3>
-              </div>
-              <button
-                @click="resetFilters"
-                class="text-xs font-semibold px-3 py-1.5 rounded-md transition-all"
-                style="color: var(--color-text-tertiary); border: 1px solid var(--color-border);"
-              >
-                Reset
-              </button>
-            </div>
+      <!-- Models Tab (Read-Only Catalog) -->
+      <div v-if="activeTab === 'models'" class="flex-1 overflow-y-auto p-8">
+        <div class="max-w-3xl">
+          <h2 class="text-lg font-bold mb-1" style="color: var(--color-text-primary);">Model Catalog</h2>
+          <p class="text-xs mb-6" style="color: var(--color-text-tertiary);">
+            {{ availableModels.length }} models available. Select models from the chat input dropdown.
+          </p>
 
-            <div class="p-4 space-y-4">
-              <div>
-                <input
-                  v-model="filters.search"
-                  type="text"
-                  placeholder="Search models by name, ID, or provider..."
-                  class="input-material"
-                  style="font-size: 14px;"
-                />
-              </div>
-
-              <div class="grid grid-cols-3 gap-3">
-                <!-- Provider Filter -->
-                <div>
-                  <label class="mb-1.5 font-semibold text-xs flex items-center gap-1.5" style="color: var(--color-text-tertiary);">Provider</label>
-                  <select v-model="filters.provider" class="input-material text-sm">
-                    <option value="">All Providers</option>
-                    <option v-for="provider in uniqueProviders" :key="provider" :value="provider">{{ provider }}</option>
-                  </select>
-                </div>
-
-                <!-- Category Filter -->
-                <div>
-                  <label class="mb-1.5 font-semibold text-xs flex items-center gap-1.5" style="color: var(--color-text-tertiary);">Category</label>
-                  <select v-model="filters.category" class="input-material text-sm">
-                    <option value="">All Categories</option>
-                    <option v-for="cat in categories" :key="cat" :value="cat">{{ categoryLabels[cat] }}</option>
-                  </select>
-                </div>
-
-                <!-- Sort By -->
-                <div>
-                  <label class="mb-1.5 font-semibold text-xs flex items-center gap-1.5" style="color: var(--color-text-tertiary);">Sort By</label>
-                  <select v-model="filters.sortBy" class="input-material text-sm">
-                    <option value="category">Category</option>
-                    <option value="name">Name (A-Z)</option>
-                    <option value="provider">Provider</option>
-                    <option value="price">Price (Low to High)</option>
-                  </select>
-                </div>
-              </div>
-
-              <!-- Quick Actions -->
-              <div class="flex gap-2 pt-3 border-t" style="border-color: var(--color-border);">
-                <button @click="selectAllFiltered" class="btn-material px-3 py-1.5 text-xs font-semibold flex-1">Select All</button>
-                <button @click="deselectAllFiltered" class="btn-material px-3 py-1.5 text-xs font-semibold flex-1">Deselect All</button>
-              </div>
-            </div>
-          </div>
-
-          <!-- Model Count -->
-          <div class="mb-4 flex items-center justify-between">
-            <p class="text-sm font-medium" style="color: var(--color-text-secondary);">
-              Showing {{ filteredModels.length }} of {{ availableModels.length }} models - {{ enabledCount }} enabled
-            </p>
-          </div>
-
-          <!-- Model Grid grouped by category -->
-          <div v-for="cat in displayCategories" :key="cat" class="mb-6">
+          <div v-for="cat in CATEGORY_ORDER" :key="cat" class="mb-6">
             <div class="flex items-center gap-2 mb-3">
-              <h3 class="text-sm font-bold" style="color: var(--color-text-primary);">{{ categoryLabels[cat] }}</h3>
+              <h3 class="text-sm font-bold" style="color: var(--color-text-primary);">{{ CATEGORY_LABELS[cat] }}</h3>
               <span v-if="!subscription.canAccessCategory(cat)" class="text-[10px] font-bold px-2 py-0.5 rounded" style="background: rgba(249,115,22,0.2); color: rgb(249,115,22); border: 1px solid rgba(249,115,22,0.3);">
-                {{ categoryMinTier[cat] === 'pro' ? 'Pro+' : 'Max' }}
+                {{ CATEGORY_MIN_TIER[cat] === 'pro' ? 'Pro+' : 'Max' }}
               </span>
             </div>
 
-            <!-- Lock overlay for inaccessible categories -->
             <div v-if="!subscription.canAccessCategory(cat)" class="rounded-lg p-4 mb-3" style="background: rgba(255,255,255,0.03); border: 1px solid var(--color-border);">
               <p class="text-xs font-medium" style="color: var(--color-text-tertiary);">
-                Upgrade to {{ categoryMinTier[cat] === 'pro' ? 'Pro' : 'Max' }} to access {{ categoryLabels[cat].toLowerCase() }} models.
+                Upgrade to {{ CATEGORY_MIN_TIER[cat] === 'pro' ? 'Pro' : 'Max' }} to access {{ CATEGORY_LABELS[cat].toLowerCase() }} models.
               </p>
             </div>
 
-            <div class="grid grid-cols-2 gap-3" :class="{ 'opacity-40 pointer-events-none': !subscription.canAccessCategory(cat) }">
+            <div class="grid grid-cols-2 gap-3" :class="{ 'opacity-40': !subscription.canAccessCategory(cat) }">
               <div
-                v-for="model in getModelsForCategory(cat)"
+                v-for="model in modelsInCategory(cat)"
                 :key="model.id"
-                class="p-4 rounded-lg border-2 transition-all relative group"
-                :class="localEnabledModels[model.id] ? 'border-primary bg-primary/10' : 'border-white/10 bg-white/5 hover:border-white/20'"
+                class="p-4 rounded-lg"
+                style="background: var(--color-background-secondary); border: 1px solid var(--color-border);"
               >
-                <div class="flex items-start gap-3 cursor-pointer" @click="toggleModel(model.id)">
-                  <input
-                    type="checkbox"
-                    :checked="localEnabledModels[model.id]"
-                    class="w-4 h-4 rounded mt-1 flex-shrink-0"
-                    style="accent-color: var(--color-primary);"
-                    @click.stop="toggleModel(model.id)"
-                  />
-                  <div class="flex-1 min-w-0">
-                    <div class="flex items-center gap-2 mb-1 flex-wrap">
-                      <h4 class="text-sm font-bold truncate" style="color: var(--color-text-primary);">{{ model.name }}</h4>
-                    </div>
-                    <p class="text-xs mb-2 truncate" style="color: var(--color-text-tertiary);">{{ model.id }}</p>
-                    <div class="flex flex-wrap gap-2 text-xs" style="color: var(--color-text-tertiary);">
-                      <span>{{ formatContextLength(model.contextLength) }}</span>
-                      <span>${{ formatPrice(model.pricing.prompt) }}/${{ formatPrice(model.pricing.completion) }} /1M</span>
-                      <span>{{ model.provider }}</span>
-                    </div>
-                  </div>
+                <div class="flex items-center gap-2 mb-1">
+                  <h4 class="text-sm font-bold truncate" style="color: var(--color-text-primary);">{{ model.name }}</h4>
+                </div>
+                <p class="text-xs mb-2 truncate" style="color: var(--color-text-tertiary);">{{ model.provider }}</p>
+                <div class="flex flex-wrap gap-2 text-xs" style="color: var(--color-text-tertiary);">
+                  <span>{{ formatContextLength(model.contextLength) }} ctx</span>
+                  <span>${{ formatPrice(model.pricing.prompt) }}/${{ formatPrice(model.pricing.completion) }} /1M</span>
                 </div>
               </div>
             </div>
-          </div>
-
-          <div v-if="filteredModels.length === 0" class="text-center py-12">
-            <p class="text-sm" style="color: var(--color-text-tertiary);">No models found matching your filters</p>
           </div>
 
           <!-- Refresh -->
@@ -323,17 +233,6 @@
               Last refreshed {{ formatLastRefresh() }}
             </p>
           </div>
-        </div>
-
-        <!-- Action Buttons -->
-        <div class="p-6 border-t flex justify-end gap-3" style="border-color: var(--color-border); background: var(--color-background-secondary);">
-          <button @click="handleUndoModels" :disabled="!hasModelChanges" class="btn-material px-6 py-2.5" :style="!hasModelChanges ? 'opacity: 0.5; cursor: not-allowed;' : ''">
-            Undo Changes
-          </button>
-          <button @click="handleSaveModels" :disabled="!hasModelChanges || isSaving" class="btn-material px-6 py-2.5 font-semibold flex items-center gap-3" :style="(!hasModelChanges || isSaving) ? 'opacity: 0.5; cursor: not-allowed;' : 'background: var(--color-primary-muted); color: var(--color-primary); border-color: var(--color-primary);'">
-            <div v-if="isSaving" class="loading-spinner-small"></div>
-            <span>{{ isSaving ? 'Saving...' : 'Save Changes' }}</span>
-          </button>
         </div>
       </div>
 
@@ -389,7 +288,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import type { Settings, LLMModel, ModelCategory } from '../types';
-import { CATEGORY_ORDER, CATEGORY_LABELS, CATEGORY_MIN_TIER, validateSelectedModels } from '../types';
+import { CATEGORY_ORDER, CATEGORY_LABELS, CATEGORY_MIN_TIER } from '../types';
 import { useSubscription } from '../composables/useSubscription';
 import { sortModels } from '../services/openrouter';
 
@@ -420,8 +319,7 @@ const activeTab = ref<'plan' | 'models' | 'account'>('plan');
 
 // Models state
 const availableModels = computed(() => subscription.availableModels.value);
-const localEnabledModels = ref<Record<string, boolean>>({ ...props.settings.enabledModels });
-const originalEnabledModels = ref<Record<string, boolean>>({ ...props.settings.enabledModels });
+const sortedModels = computed(() => sortModels([...availableModels.value]));
 
 // Plan tab state
 const isUpgrading = ref(false);
@@ -430,31 +328,6 @@ const customTopupAmount = ref<number | null>(null);
 
 // Models tab state
 const isRefreshingModels = ref(false);
-const isSaving = ref(false);
-const categories = CATEGORY_ORDER;
-const categoryLabels = CATEGORY_LABELS;
-const categoryMinTier = CATEGORY_MIN_TIER;
-
-// Filters
-const filters = ref({
-  search: '',
-  provider: '',
-  category: '' as '' | ModelCategory,
-  sortBy: 'category' as 'category' | 'name' | 'provider' | 'price',
-});
-
-const uniqueProviders = computed(() => {
-  const providers = new Set(availableModels.value.map(m => m.provider));
-  return Array.from(providers).sort();
-});
-
-const hasModelChanges = computed(() => {
-  return JSON.stringify(localEnabledModels.value) !== JSON.stringify(originalEnabledModels.value);
-});
-
-const enabledCount = computed(() => {
-  return Object.values(localEnabledModels.value).filter(v => v === true).length;
-});
 
 const tierBadgeStyle = computed(() => {
   const styles: Record<string, string> = {
@@ -472,71 +345,8 @@ const subscriptionProgressWidth = computed(() => {
   return `${pct}%`;
 });
 
-// Filtered and sorted models
-const filteredModels = computed(() => {
-  let models = [...availableModels.value];
-
-  if (filters.value.search.trim()) {
-    const query = filters.value.search.toLowerCase();
-    models = models.filter(m =>
-      m.name.toLowerCase().includes(query) ||
-      m.id.toLowerCase().includes(query) ||
-      m.provider.toLowerCase().includes(query) ||
-      (m.description && m.description.toLowerCase().includes(query))
-    );
-  }
-
-  if (filters.value.provider) {
-    models = models.filter(m => m.provider === filters.value.provider);
-  }
-
-  if (filters.value.category) {
-    models = models.filter(m => m.category === filters.value.category);
-  }
-
-  if (filters.value.sortBy === 'name') {
-    models.sort((a, b) => a.name.localeCompare(b.name));
-  } else if (filters.value.sortBy === 'provider') {
-    models.sort((a, b) => a.provider.localeCompare(b.provider) || a.name.localeCompare(b.name));
-  } else if (filters.value.sortBy === 'price') {
-    models.sort((a, b) => a.pricing.prompt - b.pricing.prompt);
-  } else {
-    models = sortModels(models);
-  }
-
-  return models;
-});
-
-// Categories that have models to display
-const displayCategories = computed(() => {
-  if (filters.value.category) return [filters.value.category];
-  return CATEGORY_ORDER.filter(cat =>
-    filteredModels.value.some(m => m.category === cat)
-  );
-});
-
-function getModelsForCategory(cat: ModelCategory): LLMModel[] {
-  return filteredModels.value.filter(m => m.category === cat);
-}
-
-function toggleModel(modelId: string) {
-  localEnabledModels.value[modelId] = !localEnabledModels.value[modelId];
-}
-
-function selectAllFiltered() {
-  filteredModels.value.forEach(model => {
-    localEnabledModels.value[model.id] = true;
-  });
-}
-
-function deselectAllFiltered() {
-  filteredModels.value.forEach(model => {
-    localEnabledModels.value[model.id] = false;
-  });
-}
-
-function resetFilters() {
-  filters.value = { search: '', provider: '', category: '', sortBy: 'category' };
+function modelsInCategory(cat: ModelCategory): LLMModel[] {
+  return sortedModels.value.filter(m => m.category === cat);
 }
 
 function formatContextLength(length: number): string {
@@ -561,58 +371,12 @@ function formatLastRefresh(): string {
   return new Date(props.settings.lastModelRefresh).toLocaleDateString();
 }
 
-function handleUndoModels() {
-  localEnabledModels.value = { ...originalEnabledModels.value };
-}
-
-async function handleSaveModels() {
-  isSaving.value = true;
-  try {
-    originalEnabledModels.value = { ...localEnabledModels.value };
-
-    let cleanedSelectedModels: LLMModel[] = [];
-    if (props.settings.lastChatSelectedModels && props.settings.lastChatSelectedModels.length > 0) {
-      cleanedSelectedModels = validateSelectedModels(
-        props.settings.lastChatSelectedModels,
-        availableModels.value,
-        localEnabledModels.value
-      );
-    }
-
-    const updatedSettings: Settings = {
-      ...props.settings,
-      enabledModels: localEnabledModels.value,
-      lastChatSelectedModels: cleanedSelectedModels,
-    };
-    emit('save', updatedSettings);
-  } finally {
-    isSaving.value = false;
-  }
-}
-
 async function handleRefreshModels() {
   if (isRefreshingModels.value) return;
   isRefreshingModels.value = true;
   try {
     await subscription.refreshModels();
-
-    // Clean up enabled models
-    const availableIds = new Set(subscription.availableModels.value.map(m => m.id));
-    const cleaned: Record<string, boolean> = {};
-    Object.keys(localEnabledModels.value).forEach(id => {
-      if (availableIds.has(id) && localEnabledModels.value[id]) {
-        cleaned[id] = true;
-      }
-    });
-    localEnabledModels.value = cleaned;
-    originalEnabledModels.value = { ...cleaned };
-
-    const updatedSettings: Settings = {
-      ...props.settings,
-      enabledModels: { ...cleaned },
-      lastModelRefresh: Date.now(),
-    };
-    emit('save', updatedSettings);
+    emit('save', { ...props.settings, lastModelRefresh: Date.now() });
   } catch (error) {
     console.error('[SettingsPage] Failed to refresh models:', error);
     alert('Failed to refresh models. Please check your connection and try again.');
@@ -665,16 +429,6 @@ function handleBack() {
 </script>
 
 <style scoped>
-.loading-spinner-small {
-  width: 16px;
-  height: 16px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top-color: var(--color-primary);
-  border-radius: 50%;
-  animation: spin 0.6s linear infinite;
-  flex-shrink: 0;
-}
-
 .animate-spin {
   animation: spin 1s linear infinite;
 }

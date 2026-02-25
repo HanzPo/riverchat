@@ -2,6 +2,7 @@ import { ref, computed } from 'vue';
 import type { SubscriptionTier, LLMModel, ModelCategory, UsageMetadata } from '../types';
 import { CATEGORY_MIN_TIER } from '../types';
 import { callGetBalance, callGetModels, callCreateCheckout, callCreateTopupCheckout, callCreatePortalSession } from '../services/cloud-functions';
+import { FALLBACK_MODELS } from '../config/models';
 
 // Global subscription state
 const tier = ref<SubscriptionTier>('free');
@@ -73,7 +74,10 @@ export function useSubscription() {
     try {
       availableModels.value = await callGetModels();
     } catch (error) {
-      console.error('[Subscription] Failed to load models:', error);
+      console.error('[Subscription] Failed to load models from server, using fallback catalog:', error);
+      if (availableModels.value.length === 0) {
+        availableModels.value = FALLBACK_MODELS;
+      }
     } finally {
       isLoadingModels.value = false;
     }

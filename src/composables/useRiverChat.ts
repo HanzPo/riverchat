@@ -1,10 +1,9 @@
 import { ref, computed, watch } from 'vue';
 import { v4 as uuidv4 } from 'uuid';
 import type { River, MessageNode, LLMModel, Settings } from '../types';
-import { getDefaultEnabledModelsRecord } from '../types';
+import { DEFAULT_MODEL_ID } from '../types';
 import { FirestoreStorageService } from '../services/firestore-storage';
 import { LLMAPIService } from '../services/llm-api';
-import { sortModels } from '../services/openrouter';
 import { useSubscription } from './useSubscription';
 import { usePostHog, captureException } from './usePostHog';
 
@@ -30,7 +29,7 @@ function debounce<T extends (...args: any[]) => any>(
 
 // Global state
 const currentRiver = ref<River | null>(null);
-const settings = ref<Settings>({ lastUsedModel: null, enabledModels: {}, lastChatSelectedModels: [], lastModelRefresh: undefined });
+const settings = ref<Settings>({ lastUsedModelId: null, selectedModelIds: [], lastModelRefresh: undefined });
 const selectedNodeId = ref<string | null>(null);
 const allRivers = ref<River[]>([]);
 const isLoading = ref(false);
@@ -327,7 +326,7 @@ export function useRiverChat() {
     selectedNodeId.value = aiNode.id;
 
     // Update last used model
-    settings.value.lastUsedModel = model;
+    settings.value.lastUsedModelId = model.id;
 
     const analytics = usePostHog();
     const startTime = Date.now();
@@ -591,11 +590,11 @@ export function useRiverChat() {
         subscription.refreshModels(),
       ]);
 
-      // If models loaded, set up default enabled models if needed
+      // Set default selected model if none
       if (subscription.availableModels.value.length > 0) {
-        const sorted = sortModels([...subscription.availableModels.value]);
-        if (!settings.value.enabledModels || Object.keys(settings.value.enabledModels).length === 0) {
-          settings.value.enabledModels = getDefaultEnabledModelsRecord(sorted);
+        if (!settings.value.selectedModelIds || settings.value.selectedModelIds.length === 0) {
+          const defaultModel = subscription.availableModels.value.find(m => m.id === DEFAULT_MODEL_ID);
+          settings.value.selectedModelIds = [defaultModel?.id ?? subscription.availableModels.value[0]!.id];
           await FirestoreStorageService.saveSettings(settings.value);
         }
         settings.value.lastModelRefresh = Date.now();

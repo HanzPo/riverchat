@@ -37,9 +37,8 @@ export interface UsageMetadata {
 }
 
 export interface Settings {
-  lastUsedModel: LLMModel | null;
-  enabledModels: Record<string, boolean>; // Model ID -> enabled status
-  lastChatSelectedModels?: LLMModel[]; // Last selected models in chat
+  lastUsedModelId: string | null; // Model ID of last used model
+  selectedModelIds: string[]; // Currently selected model IDs for chat
   lastModelRefresh?: number; // Timestamp of last model list refresh
 }
 
@@ -103,62 +102,15 @@ export interface VueFlowEdge {
   style?: Record<string, string>;
 }
 
-/**
- * Helper function to get list of enabled models from enabledModels record
- */
-export function getEnabledModelsList(enabledModels: Record<string, boolean>, availableModels: LLMModel[]): LLMModel[] {
-  return availableModels.filter(model => enabledModels[model.id] === true);
-}
+/** Default model ID for new users */
+export const DEFAULT_MODEL_ID = 'deepseek/deepseek-v3.2';
 
-/**
- * Helper function to create default enabledModels record
- */
-export function getDefaultEnabledModelsRecord(models: LLMModel[]): Record<string, boolean> {
-  const record: Record<string, boolean> = {};
-
-  // Preferred default models to enable (budget models)
-  const defaultModelIds = [
-    'deepseek/deepseek-v3.2',
-    'meta-llama/llama-4-maverick',
-    'meta-llama/llama-4-scout',
-  ];
-
-  const enabledCount = defaultModelIds.reduce((count, modelId) => {
-    const model = models.find(m => m.id === modelId);
-    if (model) {
-      record[model.id] = true;
-      return count + 1;
-    }
-    return count;
-  }, 0);
-
-  if (enabledCount === 0) {
-    models.slice(0, Math.min(5, models.length)).forEach(model => {
-      record[model.id] = true;
-    });
-  }
-
-  return record;
-}
-
-/**
- * Helper function to validate and clean up selected models
- */
-export function validateSelectedModels(
-  selectedModels: LLMModel[],
-  availableModels: LLMModel[],
-  enabledModels: Record<string, boolean>
-): LLMModel[] {
-  if (!selectedModels || selectedModels.length === 0) {
-    return [];
-  }
-
-  const availableModelsMap = new Map(availableModels.map(m => [m.id, m]));
-
-  return selectedModels.filter(model => {
-    const availableModel = availableModelsMap.get(model.id);
-    return availableModel && enabledModels[model.id] === true;
-  });
+/** Resolve model IDs to full LLMModel objects */
+export function resolveModelIds(ids: string[], availableModels: LLMModel[]): LLMModel[] {
+  const modelMap = new Map(availableModels.map(m => [m.id, m]));
+  return ids
+    .map(id => modelMap.get(id))
+    .filter((m): m is LLMModel => m !== undefined);
 }
 
 /** Category display order */

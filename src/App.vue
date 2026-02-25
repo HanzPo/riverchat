@@ -114,7 +114,6 @@
         <ChatHistory
           :path="currentPath"
           :selected-node-id="selectedNodeId"
-          :last-used-model="settings.lastUsedModel"
           :is-new-root-mode="isNewRootMode"
           :all-nodes="currentRiver?.nodes || {}"
           :settings="settings"
@@ -208,7 +207,6 @@
       :is-open="showChatModal"
       :path="currentPath"
       :selected-node-id="selectedNodeId"
-      :last-used-model="settings.lastUsedModel"
       :is-new-root-mode="isNewRootMode"
       :all-nodes="currentRiver?.nodes || {}"
       :settings="settings"
@@ -248,6 +246,7 @@ import { ref, computed, onMounted, watch, defineAsyncComponent } from 'vue';
 import { useRiverChat } from './composables/useRiverChat';
 import { usePostHog } from './composables/usePostHog';
 import type { MessageNode, LLMModel } from './types';
+import { resolveModelIds, DEFAULT_MODEL_ID } from './types';
 import { Folder, Search, HelpCircle, Settings, Plus, User as UserIcon } from 'lucide-vue-next';
 import { AuthService } from './services/auth';
 import type { User } from 'firebase/auth';
@@ -441,7 +440,7 @@ onMounted(async () => {
       // or if user state changed (e.g., from logged out to logged in)
       if (!isFirstAuthCheck && !wasLoggedIn) {
         // Clear chat selection on login to avoid stale models
-        settings.value.lastChatSelectedModels = [];
+        settings.value.selectedModelIds = [];
 
         // User just logged in - reload data from Firestore with force refresh
         await initialize(true);
@@ -693,8 +692,10 @@ async function handleRegenerate(parentNodeId: string) {
   const parentNode = currentRiver.value.nodes[parentNodeId];
   if (!parentNode) return;
 
-  // Use the last used model or first available model
-  const model = settings.value.lastUsedModel || subscription.availableModels.value[0];
+  // Resolve last used model ID to full model object
+  const modelId = settings.value.lastUsedModelId || DEFAULT_MODEL_ID;
+  const resolved = resolveModelIds([modelId], subscription.availableModels.value);
+  const model = resolved[0] || subscription.availableModels.value[0];
   if (!model) {
     showToast('No models available', 'error');
     return;
@@ -735,7 +736,9 @@ function confirmEditResubmit() {
     updateNodeContent(nodeId, newContent.trim());
 
     // Generate new response
-    const model = settings.value.lastUsedModel || subscription.availableModels.value[0];
+    const editModelId = settings.value.lastUsedModelId || DEFAULT_MODEL_ID;
+    const editResolved = resolveModelIds([editModelId], subscription.availableModels.value);
+    const model = editResolved[0] || subscription.availableModels.value[0];
     if (model) {
       generateAIResponse(nodeId, model, false);
       showToast('Message updated, generating new response...', 'info');
@@ -852,11 +855,11 @@ async function handleBranchFromText(nodeId: string, highlightedText: string, use
   }
 }
 
-async function handleChatModelChanged(models: LLMModel[]) {
+async function handleChatModelChanged(modelIds: string[]) {
   // Save chat model selection to persist across prompts and sessions
-  settings.value.lastChatSelectedModels = models;
+  settings.value.selectedModelIds = modelIds;
   // Persist to database immediately (bypass debounce for real-time persistence)
-  await updateSettings({ lastChatSelectedModels: models }, true);
+  await updateSettings({ selectedModelIds: modelIds }, true);
 }
 
 function handleCloseChatPanel() {
