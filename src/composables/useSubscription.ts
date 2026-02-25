@@ -1,5 +1,5 @@
 import { ref, computed } from 'vue';
-import type { SubscriptionTier, UserBalance, LLMModel, ModelCategory, UsageMetadata } from '../types';
+import type { SubscriptionTier, LLMModel, ModelCategory, UsageMetadata } from '../types';
 import { CATEGORY_MIN_TIER } from '../types';
 import { callGetBalance, callGetModels, callCreateCheckout, callCreateTopupCheckout, callCreatePortalSession } from '../services/cloud-functions';
 
