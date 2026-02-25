@@ -576,6 +576,11 @@ export function useRiverChat() {
 
   // Initialize - load data and subscription state
   async function initialize(forceRefresh: boolean = false): Promise<void> {
+    // Prevent concurrent initializations (e.g. handleAuthenticated + onAuthStateChanged racing)
+    if (isLoading.value) {
+      console.log('[useRiverChat] Initialize already in progress, skipping');
+      return;
+    }
     isLoading.value = true;
     isInitializing.value = true; // Prevent auto-save during load
     try {

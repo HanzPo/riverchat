@@ -370,25 +370,27 @@ const branchContext = ref({
 
 let isSelecting = false;
 let isInitializing = true;
+let isSyncingFromParent = false;
 
 // Initialize from settings
 watch(
   () => props.settings?.selectedModelIds,
   (ids) => {
+    isSyncingFromParent = true;
     if (ids && ids.length > 0) {
       selectedModelIds.value = [...ids];
     } else if (selectedModelIds.value.length === 0 && subscription.availableModels.value.length > 0) {
       const defaultModel = subscription.availableModels.value.find(m => m.id === DEFAULT_MODEL_ID);
       selectedModelIds.value = [defaultModel?.id ?? subscription.availableModels.value[0]!.id];
     }
-    nextTick(() => { isInitializing = false; });
+    nextTick(() => { isInitializing = false; isSyncingFromParent = false; });
   },
   { immediate: true }
 );
 
 // Sync model changes back to parent
 watch(selectedModelIds, (ids) => {
-  if (!isInitializing && ids.length > 0) {
+  if (!isInitializing && !isSyncingFromParent && ids.length > 0) {
     emit('chat-model-changed', ids);
   }
 }, { deep: true });
@@ -495,7 +497,7 @@ function handleKeydown(event: KeyboardEvent) {
 }
 
 function handleSend() {
-  if (inputText.value.trim() && selectedModelIds.value.length > 0 && canSend.value) {
+  if (inputText.value.trim() && selectedModelIds.value.length > 0 && canSend.value && !props.isSending) {
     const models = resolveModelIds(selectedModelIds.value, subscription.availableModels.value);
     if (models.length === 0) return;
 
@@ -517,7 +519,7 @@ function handleSend() {
 }
 
 function handleResend() {
-  if (selectedUserMessage.value && selectedModelIds.value.length > 0) {
+  if (selectedUserMessage.value && selectedModelIds.value.length > 0 && !props.isSending) {
     const models = resolveModelIds(selectedModelIds.value, subscription.availableModels.value);
     if (models.length === 0) return;
     emit('resend', selectedUserMessage.value.id, models, webSearchEnabled.value);

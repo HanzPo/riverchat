@@ -28,17 +28,17 @@
           <Settings :size="14" />
         </button>
 
-        <!-- Auth button - only show if not signed in or if signing in -->
+        <!-- Auth button - show for anonymous or unauthenticated users -->
         <button
-          v-if="!currentUser || isAuthenticating"
+          v-if="!currentUser || currentUser.isAnonymous || isAuthenticating"
           @click="!isAuthenticating ? showAuth = true : null"
           class="btn-material text-xs flex items-center gap-1.5 px-3 py-2"
           :class="{ 'opacity-60 cursor-wait': isAuthenticating }"
           :disabled="isAuthenticating"
-          :title="isAuthenticating ? 'Signing in...' : 'Sign In'"
+          :title="isAuthenticating ? 'Signing in...' : (currentUser?.isAnonymous ? 'Sign Up' : 'Sign In')"
         >
           <UserIcon :size="14" />
-          <span>{{ isAuthenticating ? 'Signing in...' : 'Sign In' }}</span>
+          <span>{{ isAuthenticating ? 'Signing in...' : (currentUser?.isAnonymous ? 'Sign Up' : 'Sign In') }}</span>
         </button>
       </div>
     </div>
@@ -250,6 +250,7 @@ import { resolveModelIds, DEFAULT_MODEL_ID } from './types';
 import { Folder, Search, HelpCircle, Settings, Plus, User as UserIcon } from 'lucide-vue-next';
 import { AuthService } from './services/auth';
 import type { User } from 'firebase/auth';
+import { auth } from './config/firebase';
 
 // Critical components loaded immediately
 import GraphCanvas from './components/GraphCanvas.vue';
@@ -427,22 +428,30 @@ onMounted(async () => {
   // Initialize the app with cached data
   await initialize();
 
+  // Auto-sign in anonymously if no user — gives them a real Firebase session
+  // so cloud functions (streamChat, getBalance, etc.) work immediately
+  if (!auth.currentUser) {
+    await AuthService.signInAnonymouslyIfNeeded();
+  }
+
   // Listen to authentication state changes
   let isFirstAuthCheck = true;
   AuthService.onAuthStateChanged(async (user) => {
     const wasLoggedIn = !!currentUser.value;
+    const wasAnonymous = currentUser.value?.isAnonymous ?? false;
     currentUser.value = user;
 
     if (user) {
-      console.log('User authenticated:', user.email);
+      console.log('User authenticated:', user.email || '(anonymous)');
 
-      // Only reinitialize if this is not the first check (avoiding double initialization)
-      // or if user state changed (e.g., from logged out to logged in)
-      if (!isFirstAuthCheck && !wasLoggedIn) {
+      // Reinitialize if user state meaningfully changed:
+      // - First real login (not first auth check)
+      // - Anonymous user just linked their Google account
+      if (!isFirstAuthCheck && (!wasLoggedIn || (wasAnonymous && !user.isAnonymous))) {
         // Clear chat selection on login to avoid stale models
         settings.value.selectedModelIds = [];
 
-        // User just logged in - reload data from Firestore with force refresh
+        // User just logged in or linked account - reload data from Firestore with force refresh
         await initialize(true);
       } else {
         console.log('[App] User already initialized, skipping re-initialization');
@@ -465,8 +474,8 @@ onMounted(async () => {
     chatPanelWidth.value = parseInt(savedWidth, 10);
   }
 
-  // Show welcome modal only for brand new users (no rivers, not logged in)
-  if (!currentUser.value && allRivers.value.length === 0) {
+  // Show welcome modal for new users (anonymous with no rivers)
+  if ((!currentUser.value || currentUser.value.isAnonymous) && allRivers.value.length === 0) {
     showWelcome.value = true;
   }
 
@@ -500,20 +509,11 @@ onMounted(async () => {
 
 // Authentication handlers
 async function handleAuthenticated() {
-  // User just logged in/registered
-  isAuthenticating.value = true;
-  showAuth.value = false; // Close the auth modal
-
-  try {
-    // Reload data from Firestore with force refresh
-    await initialize(true);
-    showToast('Successfully signed in!', 'success');
-  } catch (error) {
-    console.error('Error loading user data:', error);
-    showToast('Failed to load your data', 'error');
-  } finally {
-    isAuthenticating.value = false;
-  }
+  // Close the auth modal — onAuthStateChanged will handle re-initialization
+  // (signInWithGoogle fires onAuthStateChanged before returning, so initialize()
+  // is already triggered by the time this runs)
+  showAuth.value = false;
+  showToast('Successfully signed in!', 'success');
 }
 
 async function handleLogout() {
@@ -617,9 +617,8 @@ async function handleDeleteRiver(riverId: string) {
 // Message Handling
 async function handleSendMessage(content: string, models: LLMModel[], webSearchEnabled: boolean) {
   if (!currentRiver.value) {
-    handleCreateFirstRiver();
-    // Wait a tick for river to be created
-    await new Promise(resolve => setTimeout(resolve, 0));
+    await handleCreateFirstRiver();
+    if (!currentRiver.value) return; // River creation failed
   }
 
   isSendingMessage.value = true;
@@ -652,9 +651,8 @@ async function handleSendMessage(content: string, models: LLMModel[], webSearchE
 
 async function handleResend(userNodeId: string, models: LLMModel[], webSearchEnabled: boolean) {
   if (!currentRiver.value) {
-    handleCreateFirstRiver();
-    // Wait a tick for river to be created
-    await new Promise(resolve => setTimeout(resolve, 0));
+    await handleCreateFirstRiver();
+    if (!currentRiver.value) return; // River creation failed
   }
 
   const userNode = currentRiver.value?.nodes[userNodeId];

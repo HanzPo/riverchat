@@ -3,6 +3,8 @@ import {
   onAuthStateChanged,
   GoogleAuthProvider,
   signInWithPopup,
+  signInAnonymously,
+  linkWithPopup,
   type User,
   type UserCredential,
 } from 'firebase/auth';
@@ -34,7 +36,27 @@ export class AuthService {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
 
-      const userCredential = await signInWithPopup(auth, provider);
+      const currentUser = auth.currentUser;
+      let userCredential: UserCredential;
+      let wasAnonymous = false;
+
+      if (currentUser && currentUser.isAnonymous) {
+        // Link anonymous account to Google — preserves UID and all data
+        try {
+          userCredential = await linkWithPopup(currentUser, provider);
+          wasAnonymous = true;
+        } catch (linkError: any) {
+          if (linkError.code === 'auth/credential-already-in-use') {
+            // Google account already exists as a separate user — sign in directly
+            userCredential = await signInWithPopup(auth, provider);
+          } else {
+            throw linkError;
+          }
+        }
+      } else {
+        userCredential = await signInWithPopup(auth, provider);
+      }
+
       const existingProfile = await this.getUserProfile(userCredential.user.uid);
 
       if (!existingProfile) {
@@ -43,6 +65,9 @@ export class AuthService {
         } catch (profileError: any) {
           console.error('Error creating profile for Google user:', profileError);
         }
+      } else if (wasAnonymous) {
+        // Update profile with Google display info after linking
+        await this.updateProfileWithGoogleInfo(userCredential.user);
       } else {
         await this.updateLastLogin(userCredential.user.uid);
       }
@@ -56,6 +81,7 @@ export class AuthService {
         analytics.capture('user_signed_in', {
           method: 'google',
           is_new_user: !existingProfile,
+          was_anonymous: wasAnonymous,
         });
       }
 
@@ -75,6 +101,36 @@ export class AuthService {
 
       throw new Error(this.getAuthErrorMessage(error.code));
     }
+  }
+
+  static async signInAnonymouslyIfNeeded(): Promise<User | null> {
+    if (auth.currentUser) return auth.currentUser;
+
+    try {
+      const credential = await signInAnonymously(auth);
+      const user = credential.user;
+
+      // Create profile with $2.00 free credits
+      const existingProfile = await this.getUserProfile(user.uid);
+      if (!existingProfile) {
+        await this.createUserProfile(user);
+      }
+
+      CacheService.cacheAuthState(user);
+
+      const analytics = usePostHog();
+      analytics.identify(user.uid, { isAnonymous: true });
+      analytics.capture('anonymous_user_created');
+
+      return user;
+    } catch (error) {
+      console.error('Anonymous sign-in error:', error);
+      return null;
+    }
+  }
+
+  static isAnonymous(): boolean {
+    return auth.currentUser?.isAnonymous ?? false;
   }
 
   static async logout(): Promise<void> {
@@ -174,6 +230,19 @@ export class AuthService {
     } catch (error) {
       console.error('Error creating user profile:', error);
       throw error;
+    }
+  }
+
+  private static async updateProfileWithGoogleInfo(user: User): Promise<void> {
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      await setDoc(userRef, {
+        email: user.email || '',
+        displayName: user.displayName || '',
+        lastLoginAt: serverTimestamp(),
+      }, { merge: true });
+    } catch (error) {
+      console.error('Error updating profile with Google info:', error);
     }
   }
 

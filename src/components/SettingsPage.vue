@@ -239,7 +239,8 @@
       <!-- Account Tab -->
       <div v-if="activeTab === 'account'" class="flex-1 overflow-y-auto p-8">
         <div class="max-w-2xl">
-          <div v-if="currentUser" class="mb-8">
+          <!-- Signed-in user (non-anonymous) -->
+          <div v-if="currentUser && !currentUser.isAnonymous" class="mb-8">
             <h2 class="text-lg font-bold mb-4" style="color: var(--color-text-primary);">Account Information</h2>
 
             <div class="rounded-lg p-4 mb-4" style="background: var(--color-background-secondary); border: 1px solid var(--color-border);">
@@ -269,6 +270,7 @@
             </button>
           </div>
 
+          <!-- Anonymous or not signed in -->
           <div v-else class="mb-8">
             <div class="rounded-lg p-6 text-center" style="background: var(--color-background-secondary); border: 1px solid var(--color-border);">
               <svg class="mx-auto mb-4" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--color-text-tertiary);">
@@ -276,7 +278,7 @@
                 <circle cx="12" cy="7" r="4"/>
               </svg>
               <p class="text-sm font-medium mb-2" style="color: var(--color-text-primary);">Not signed in</p>
-              <p class="text-xs" style="color: var(--color-text-tertiary);">Sign in to sync your data across devices</p>
+              <p class="text-xs" style="color: var(--color-text-tertiary);">Sign in with Google to sync your data across devices and keep your conversations safe.</p>
             </div>
           </div>
         </div>
@@ -294,7 +296,7 @@ import { sortModels } from '../services/openrouter';
 
 interface Props {
   settings: Settings;
-  currentUser?: { uid: string; email: string | null; displayName: string | null } | null;
+  currentUser?: { uid: string; email: string | null; displayName: string | null; isAnonymous?: boolean } | null;
   isAuthenticating?: boolean;
 }
 

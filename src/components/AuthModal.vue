@@ -3,10 +3,12 @@
     <div class="modal-content w-[500px] p-8">
       <div class="mb-6">
         <h2 class="text-xl font-semibold mb-2" style="color: var(--color-text-primary); letter-spacing: -0.01em;">
-          Welcome to RiverChat
+          {{ isAnonymous ? 'Save Your Conversations' : 'Welcome to RiverChat' }}
         </h2>
         <p class="text-sm font-medium" style="color: var(--color-text-secondary);">
-          Sign in with Google to sync your data across devices
+          {{ isAnonymous
+            ? 'Connect your Google account to save your conversations and credits permanently'
+            : 'Sign in with Google to sync your data across devices' }}
         </p>
       </div>
 
@@ -27,7 +29,9 @@
         style="background: var(--color-info-bg); border: 1px solid var(--color-info);"
       >
         <p class="text-xs leading-relaxed font-medium" style="color: var(--color-text-primary);">
-          Your API keys will be encrypted and stored securely. You can access your data from any device.
+          {{ isAnonymous
+            ? 'Linking your Google account will preserve all your existing conversations and remaining credits.'
+            : 'Sign in to sync your conversations and credits across devices.' }}
         </p>
       </div>
 
@@ -45,10 +49,10 @@
           <path d="M3.964 10.712c-.18-.54-.282-1.117-.282-1.71 0-.593.102-1.17.282-1.71V4.96H.957C.347 6.175 0 7.55 0 9.002c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
           <path d="M9.003 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.464.891 11.426 0 9.003 0 5.482 0 2.438 2.017.96 4.958L3.967 7.29c.708-2.127 2.692-3.71 5.036-3.71z" fill="#EA4335"/>
         </svg>
-        {{ isLoading ? 'Signing in...' : 'Sign in with Google' }}
+        {{ isLoading ? 'Signing in...' : (isAnonymous ? 'Sign up with Google' : 'Sign in with Google') }}
       </button>
 
-      <!-- Continue Without Account -->
+      <!-- Cancel button -->
       <button
         type="button"
         @click="emit('close')"
@@ -56,16 +60,17 @@
         :disabled="isLoading"
         style="padding: 10px 16px;"
       >
-        Continue Without Account
+        {{ isAnonymous ? 'Maybe Later' : 'Cancel' }}
       </button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { AuthService } from '../services/auth';
 import { FirestoreStorageService } from '../services/firestore-storage';
+import { auth } from '../config/firebase';
 
 interface Props {
   isOpen: boolean;
@@ -82,6 +87,7 @@ const emit = defineEmits<Emits>();
 
 const errorMessage = ref('');
 const isLoading = ref(false);
+const isAnonymous = computed(() => auth.currentUser?.isAnonymous ?? false);
 
 // Reset form when modal opens
 watch(
