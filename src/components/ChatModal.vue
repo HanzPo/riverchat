@@ -696,12 +696,13 @@ onUnmounted(() => {
 <style scoped>
 /* Loading Spinner */
 .loading-spinner-small {
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
   border: 2px solid rgba(255, 255, 255, 0.3);
   border-top-color: white;
   border-radius: 50%;
   animation: spin 0.6s linear infinite;
+  flex-shrink: 0;
 }
 
 @keyframes spin {
