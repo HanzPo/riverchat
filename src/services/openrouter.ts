@@ -1,134 +1,78 @@
-import type { OpenRouterModel, LLMModel } from '../types';
-import { SHARED_OPENROUTER_API_KEY } from '../types';
-
-const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models';
+import type { LLMModel, ModelCategory, SubscriptionTier } from '../types';
+import { CATEGORY_MIN_TIER } from '../types';
 
 /**
- * Fetch all available models from OpenRouter
+ * Filter models based on user's subscription tier.
+ * Models whose category requires a higher tier are marked as inaccessible.
  */
-export async function fetchOpenRouterModels(): Promise<OpenRouterModel[]> {
-  try {
-    const response = await fetch(OPENROUTER_MODELS_URL);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch models: ${response.statusText}`);
-    }
-    const data = await response.json();
-    return data.data || [];
-  } catch (error) {
-    console.error('Error fetching OpenRouter models:', error);
-    throw error;
-  }
+export function filterModelsByTier(models: LLMModel[], tier: SubscriptionTier): LLMModel[] {
+  const tierOrder: Record<SubscriptionTier, number> = { free: 0, pro: 1, max: 2 };
+  const userTierLevel = tierOrder[tier];
+
+  return models.map(model => ({
+    ...model,
+    accessible: tierOrder[CATEGORY_MIN_TIER[model.category]] <= userTierLevel,
+  }));
 }
 
 /**
- * Extract provider name from model ID
- * e.g., "openai/gpt-4o" -> "OpenAI"
+ * Get only accessible models for a tier (filters out inaccessible ones).
  */
-function extractProviderName(modelId: string): string {
-  const providerSlug = modelId.split('/')[0] || '';
-
-  // Map common provider slugs to display names
-  const providerMap: Record<string, string> = {
-    'openai': 'OpenAI',
-    'anthropic': 'Anthropic',
-    'google': 'Google',
-    'meta-llama': 'Meta',
-    'mistralai': 'Mistral',
-    'cohere': 'Cohere',
-    'ai21': 'AI21',
-    'huggingfaceh4': 'HuggingFace',
-    'nousresearch': 'Nous Research',
-    'gryphe': 'Gryphe',
-    'undi95': 'Undi95',
-    'pygmalionai': 'PygmalionAI',
-    'alpindale': 'AlpinDale',
-    'koboldai': 'KoboldAI',
-    'microsoft': 'Microsoft',
-  };
-
-  return providerMap[providerSlug] || providerSlug.charAt(0).toUpperCase() + providerSlug.slice(1);
+export function getAccessibleModels(models: LLMModel[], tier: SubscriptionTier): LLMModel[] {
+  return filterModelsByTier(models, tier).filter(m => m.accessible);
 }
 
 /**
- * Transform OpenRouter model to our LLMModel format
- */
-export function transformOpenRouterModel(orModel: OpenRouterModel): LLMModel {
-  const promptPrice = parseFloat(orModel.pricing.prompt);
-  const completionPrice = parseFloat(orModel.pricing.completion);
-
-  // A model is considered free if both prompt and completion prices are 0
-  const isFree = promptPrice === 0 && completionPrice === 0;
-
-  return {
-    id: orModel.id,
-    name: orModel.name,
-    description: orModel.description,
-    contextLength: orModel.context_length,
-    pricing: {
-      prompt: promptPrice * 1000000, // Convert to cost per million tokens
-      completion: completionPrice * 1000000,
-    },
-    isFree,
-    provider: extractProviderName(orModel.id),
-  };
-}
-
-/**
- * Fetch and transform all available models
- */
-export async function getAvailableModels(): Promise<LLMModel[]> {
-  const orModels = await fetchOpenRouterModels();
-  return orModels.map(transformOpenRouterModel);
-}
-
-/**
- * Filter models based on API key
- * If using shared key, only return free models
- * If using custom key, return all models
- */
-export function filterModelsByApiKey(models: LLMModel[], apiKey: string): LLMModel[] {
-  const isUsingSharedKey = !apiKey || apiKey === SHARED_OPENROUTER_API_KEY;
-
-  if (isUsingSharedKey) {
-    // Only free models for shared key users
-    return models.filter(model => model.isFree);
-  }
-
-  // All models for custom key users
-  return models;
-}
-
-/**
- * Sort models by relevance (popular models first, then alphabetically)
+ * Sort models: by category order, then by priority within category.
  */
 export function sortModels(models: LLMModel[]): LLMModel[] {
-  // Define priority models that should appear first
+  const categoryOrder: Record<ModelCategory, number> = {
+    budget: 0,
+    standard: 1,
+    premium: 2,
+    frontier: 3,
+  };
+
   const priorityModels = [
-    'openai/gpt-4o',
-    'openai/gpt-4o-mini',
-    'anthropic/claude-3.5-sonnet',
-    'anthropic/claude-3-haiku',
-    'google/gemini-pro',
-    'google/gemini-flash',
+    'deepseek/deepseek-v3.2',
+    'meta-llama/llama-4-maverick',
+    'openai/gpt-5.1-codex-mini',
+    'google/gemini-3-flash-preview',
+    'anthropic/claude-haiku-4.5',
+    'openai/gpt-5.2',
+    'anthropic/claude-sonnet-4.6',
+    'anthropic/claude-opus-4.6',
   ];
 
   return models.sort((a, b) => {
-    // Check if models are in priority list
+    const catDiff = categoryOrder[a.category] - categoryOrder[b.category];
+    if (catDiff !== 0) return catDiff;
+
     const aPriority = priorityModels.indexOf(a.id);
     const bPriority = priorityModels.indexOf(b.id);
 
-    // Both in priority list - sort by priority order
-    if (aPriority !== -1 && bPriority !== -1) {
-      return aPriority - bPriority;
-    }
-
-    // Only a is in priority list
+    if (aPriority !== -1 && bPriority !== -1) return aPriority - bPriority;
     if (aPriority !== -1) return -1;
-
-    // Only b is in priority list
     if (bPriority !== -1) return 1;
 
-    // Neither in priority list - sort alphabetically by name
     return a.name.localeCompare(b.name);
   });
+}
+
+/**
+ * Group models by category.
+ */
+export function groupModelsByCategory(models: LLMModel[]): Record<ModelCategory, LLMModel[]> {
+  const groups: Record<ModelCategory, LLMModel[]> = {
+    budget: [],
+    standard: [],
+    premium: [],
+    frontier: [],
+  };
+
+  for (const model of models) {
+    groups[model.category].push(model);
+  }
+
+  return groups;
 }

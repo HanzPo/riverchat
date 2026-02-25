@@ -1,78 +1,45 @@
 // Core types for RiverChat
 
-// OpenRouter model data from API
-export interface OpenRouterModel {
-  id: string; // e.g., "openai/gpt-4o"
-  name: string; // e.g., "GPT-4o"
-  description?: string;
-  context_length: number;
-  pricing: {
-    prompt: string; // Cost per million prompt tokens
-    completion: string; // Cost per million completion tokens
-  };
-  top_provider?: {
-    max_completion_tokens?: number;
-    is_moderated: boolean;
-  };
-  architecture?: {
-    modality?: string;
-    tokenizer?: string;
-    instruct_type?: string | null;
-  };
-}
+export type SubscriptionTier = 'free' | 'pro' | 'max';
+export type ModelCategory = 'budget' | 'standard' | 'premium' | 'frontier';
 
 export interface LLMModel {
-  id: string; // OpenRouter model ID (e.g., "openai/gpt-4o")
+  id: string; // OpenRouter model ID (e.g., "openai/gpt-5.2")
   name: string; // Display name
   description?: string;
   contextLength: number;
   pricing: {
-    prompt: number; // Cost per million prompt tokens
-    completion: number; // Cost per million completion tokens
+    prompt: number; // Our price per million prompt tokens (with 1.5x markup)
+    completion: number; // Our price per million completion tokens (with 1.5x markup)
   };
-  isFree: boolean; // Whether the model is free
+  category: ModelCategory;
   provider: string; // e.g., "OpenAI", "Anthropic", "Google"
+  accessible?: boolean; // Whether user's tier can use this model
 }
 
-export interface APIKeys {
-  openrouter: string;
-}
-
-// Pricing and subscription types
-export type SubscriptionTier = 'free' | 'basic' | 'pro' | 'enterprise';
-
-export interface SubscriptionInfo {
+export interface UserBalance {
+  subscriptionCredits: number; // cents
+  prepaidCredits: number; // cents
+  total: number; // cents
   tier: SubscriptionTier;
-  monthlyCredits: number;
-  price: number; // in USD
-  features: string[];
+  currentPeriodEnd: number | null; // epoch ms
 }
 
-export interface CreditTransaction {
-  id: string;
-  userId: string;
-  amount: number; // Positive for addition, negative for usage
-  type: 'purchase' | 'subscription' | 'usage' | 'refund';
-  description: string;
-  modelUsed?: string; // For usage transactions
-  timestamp: any; // Firestore timestamp
-  balanceAfter: number;
-}
-
-export interface UserCredits {
-  balance: number;
-  subscriptionTier: SubscriptionTier;
-  monthlyCredits: number;
-  nextRefreshDate: string | null;
-  lastUpdated: any; // Firestore timestamp
+export interface UsageMetadata {
+  cost: number; // cents
+  promptTokens: number;
+  completionTokens: number;
+  balanceAfter?: {
+    subscriptionCredits: number;
+    prepaidCredits: number;
+    total: number;
+  };
 }
 
 export interface Settings {
-  apiKeys: APIKeys;
   lastUsedModel: LLMModel | null;
-  enabledModels: Record<string, boolean>; // Model ID -> enabled status (single source of truth)
-  lastChatSelectedModels?: LLMModel[]; // Last selected models in chat (persists across prompts)
-  availableModels?: LLMModel[]; // All available models from OpenRouter (cached)
+  enabledModels: Record<string, boolean>; // Model ID -> enabled status
+  lastChatSelectedModels?: LLMModel[]; // Last selected models in chat
   lastModelRefresh?: number; // Timestamp of last model list refresh
 }
 
@@ -136,9 +103,6 @@ export interface VueFlowEdge {
   style?: Record<string, string>;
 }
 
-// Shared OpenRouter API key (for free tier users)
-export const SHARED_OPENROUTER_API_KEY = import.meta.env.VITE_SHARED_OPENROUTER_API_KEY || '';
-
 /**
  * Helper function to get list of enabled models from enabledModels record
  */
@@ -151,15 +115,14 @@ export function getEnabledModelsList(enabledModels: Record<string, boolean>, ava
  */
 export function getDefaultEnabledModelsRecord(models: LLMModel[]): Record<string, boolean> {
   const record: Record<string, boolean> = {};
-  
-  // Preferred default models to enable
+
+  // Preferred default models to enable (budget models)
   const defaultModelIds = [
-    'google/gemma-3-27b-it:free',
-    'meta-llama/llama-3.3-70b-instruct:free',
-    'openai/gpt-oss-20b:free',
+    'deepseek/deepseek-v3.2',
+    'meta-llama/llama-4-maverick',
+    'meta-llama/llama-4-scout',
   ];
-  
-  // Enable all preferred default models that are available
+
   const enabledCount = defaultModelIds.reduce((count, modelId) => {
     const model = models.find(m => m.id === modelId);
     if (model) {
@@ -168,20 +131,18 @@ export function getDefaultEnabledModelsRecord(models: LLMModel[]): Record<string
     }
     return count;
   }, 0);
-  
-  // Fallback: if none of the preferred models are available, enable first few models
+
   if (enabledCount === 0) {
     models.slice(0, Math.min(5, models.length)).forEach(model => {
       record[model.id] = true;
     });
   }
-  
+
   return record;
 }
 
 /**
  * Helper function to validate and clean up selected models
- * Returns a cleaned list of models that are still valid based on current settings
  */
 export function validateSelectedModels(
   selectedModels: LLMModel[],
@@ -192,46 +153,29 @@ export function validateSelectedModels(
     return [];
   }
 
-  // Create a map of available models by ID for fast lookup
   const availableModelsMap = new Map(availableModels.map(m => [m.id, m]));
-  
-  // Filter selected models to only include:
-  // 1. Models that are still available (API key hasn't changed)
-  // 2. Models that are still enabled
-  const validModels = selectedModels.filter(model => {
+
+  return selectedModels.filter(model => {
     const availableModel = availableModelsMap.get(model.id);
-    // Check if model exists in available models and is enabled
     return availableModel && enabledModels[model.id] === true;
   });
-
-  return validModels;
 }
 
-// Subscription tier configurations
-export const SUBSCRIPTION_TIERS: Record<SubscriptionTier, SubscriptionInfo> = {
-  free: {
-    tier: 'free',
-    monthlyCredits: 0,
-    price: 0,
-    features: ['Access to Free OpenRouter Models', 'Limited usage', 'Bring your own API keys'],
-  },
-  basic: {
-    tier: 'basic',
-    monthlyCredits: 10000,
-    price: 9.99,
-    features: ['10,000 credits/month', 'Access to all models', 'Priority support', 'No rate limits'],
-  },
-  pro: {
-    tier: 'pro',
-    monthlyCredits: 50000,
-    price: 29.99,
-    features: ['50,000 credits/month', 'Access to all models', 'Priority support', 'Advanced features', 'API access'],
-  },
-  enterprise: {
-    tier: 'enterprise',
-    monthlyCredits: 200000,
-    price: 99.99,
-    features: ['200,000 credits/month', 'Access to all models', '24/7 support', 'Custom integrations', 'Dedicated account manager'],
-  },
+/** Category display order */
+export const CATEGORY_ORDER: ModelCategory[] = ['budget', 'standard', 'premium', 'frontier'];
+
+/** Human-readable category labels */
+export const CATEGORY_LABELS: Record<ModelCategory, string> = {
+  budget: 'Budget',
+  standard: 'Standard',
+  premium: 'Premium',
+  frontier: 'Frontier',
 };
 
+/** Minimum tier required for each category */
+export const CATEGORY_MIN_TIER: Record<ModelCategory, SubscriptionTier> = {
+  budget: 'free',
+  standard: 'pro',
+  premium: 'pro',
+  frontier: 'max',
+};

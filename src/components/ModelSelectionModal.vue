@@ -25,8 +25,14 @@
         <div
           v-for="model in filteredModels"
           :key="model.id"
-          class="p-4 rounded-lg border-2 transition-all cursor-pointer hover:border-primary/50"
-          :class="isModelSelected(model) ? 'border-primary bg-primary/10' : 'border-white/10 bg-white/5'"
+          class="p-4 rounded-lg border-2 transition-all"
+          :class="[
+            isModelSelected(model)
+              ? 'border-primary bg-primary/10 cursor-pointer hover:border-primary/50'
+              : isAtLimit
+                ? 'border-white/10 bg-white/5 opacity-50 cursor-not-allowed'
+                : 'border-white/10 bg-white/5 cursor-pointer hover:border-primary/50',
+          ]"
           @click="toggleModel(model)"
         >
           <div class="flex items-start justify-between gap-3">
@@ -42,8 +48,15 @@
                 <h4 class="text-sm font-bold truncate" style="color: var(--color-text-primary);">
                   {{ model.name }}
                 </h4>
-                <span v-if="model.isFree" class="text-xs font-bold px-2 py-0.5 rounded bg-green-500/20 text-green-400 border border-green-500/30">
-                  FREE
+                <span class="text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider"
+                  :style="{
+                    'budget': 'background: rgba(34,197,94,0.2); color: rgb(34,197,94); border: 1px solid rgba(34,197,94,0.3);',
+                    'standard': 'background: rgba(59,130,246,0.2); color: rgb(59,130,246); border: 1px solid rgba(59,130,246,0.3);',
+                    'premium': 'background: rgba(168,85,247,0.2); color: rgb(168,85,247); border: 1px solid rgba(168,85,247,0.3);',
+                    'frontier': 'background: rgba(249,115,22,0.2); color: rgb(249,115,22); border: 1px solid rgba(249,115,22,0.3);',
+                  }[model.category]"
+                >
+                  {{ model.category }}
                 </span>
               </div>
               <p class="text-xs mb-2 truncate" style="color: var(--color-text-tertiary);">
@@ -56,8 +69,8 @@
                 <span title="Context Length">
                   📝 {{ formatContextLength(model.contextLength) }}
                 </span>
-                <span v-if="!model.isFree" title="Pricing">
-                  💰 ${{ formatPrice(model.pricing.prompt) }}/${{ formatPrice(model.pricing.completion) }}
+                <span title="Pricing (per 1M tokens)">
+                  ${{ formatPrice(model.pricing.prompt) }}/${{ formatPrice(model.pricing.completion) }}
                 </span>
                 <span title="Provider">
                   🏢 {{ model.provider }}
@@ -83,7 +96,7 @@
       <!-- Actions -->
       <div class="flex justify-between items-center pt-6" style="border-top: 1px solid var(--color-border);">
         <p class="text-sm font-medium" style="color: var(--color-text-secondary);">
-          {{ selectedModels.length }} model{{ selectedModels.length !== 1 ? 's' : '' }} selected
+          {{ selectedModels.length }} / {{ maxModelsPerPrompt === Infinity ? '∞' : maxModelsPerPrompt }} model{{ selectedModels.length !== 1 ? 's' : '' }} selected
         </p>
         <div class="flex gap-3">
           <button @click="emit('close')" class="btn-material" style="padding: 8px 16px;">
@@ -107,6 +120,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
 import type { LLMModel } from '../types';
+import { useSubscription } from '../composables/useSubscription';
 
 interface Props {
   isOpen: boolean;
@@ -121,6 +135,7 @@ interface Emits {
 
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
+const { maxModelsPerPrompt } = useSubscription();
 
 const searchQuery = ref('');
 const selectedModels = ref<LLMModel[]>([...props.initialSelectedModels]);
@@ -148,11 +163,16 @@ function isModelSelected(model: LLMModel): boolean {
   return selectedModels.value.some(m => m.id === model.id);
 }
 
+const isAtLimit = computed(() =>
+  selectedModels.value.length >= maxModelsPerPrompt.value
+);
+
 function toggleModel(model: LLMModel) {
   const index = selectedModels.value.findIndex(m => m.id === model.id);
   if (index >= 0) {
     selectedModels.value.splice(index, 1);
   } else {
+    if (isAtLimit.value) return;
     selectedModels.value.push(model);
   }
 }

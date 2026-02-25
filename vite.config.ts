@@ -35,7 +35,7 @@ export default defineConfig({
           // UI libraries
           'ui-libs': ['lucide-vue-next', 'marked', 'dompurify'],
           // Utilities
-          'utils': ['uuid', 'crypto-js']
+          'utils': ['uuid']
         },
         // Optimize chunk file names
         chunkFileNames: 'assets/[name]-[hash].js',
@@ -69,8 +69,7 @@ export default defineConfig({
       'lucide-vue-next',
       'marked',
       'dompurify',
-      'uuid',
-      'crypto-js'
+      'uuid'
     ]
   }
 })

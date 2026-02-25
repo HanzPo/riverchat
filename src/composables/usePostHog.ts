@@ -69,9 +69,7 @@ export function usePostHog() {
       if (userProfile) {
         properties.email = userProfile.email
         properties.subscription_tier = userProfile.subscriptionTier
-        properties.credit_balance = userProfile.creditBalance
         properties.created_at = userProfile.createdAt
-        properties.has_api_keys = !!userProfile.encryptedAPIKeys?.openrouter
       }
       
       posthog.identify(userId, properties)

@@ -16,8 +16,28 @@ service cloud.firestore {
     match /users/{userId} {
       // Users can read and update their own profile
       allow read: if isOwner(userId);
-      allow create: if isAuthenticated() && request.auth.uid == userId;
-      allow update: if isOwner(userId);
+      allow create: if isAuthenticated() && request.auth.uid == userId
+        && request.resource.data.subscriptionTier == 'free'
+        && request.resource.data.subscriptionCredits == 200
+        && request.resource.data.prepaidCredits == 0
+        && request.resource.data.stripeCustomerId == null
+        && request.resource.data.stripeSubscriptionId == null
+        && request.resource.data.creditEpoch == 0
+        && request.resource.data.currentPeriodStart is timestamp
+        && request.resource.data.currentPeriodEnd is timestamp
+        && request.resource.data.currentPeriodEnd > request.time
+        && request.resource.data.keys().hasOnly([
+          'uid', 'email', 'displayName', 'createdAt', 'lastLoginAt',
+          'subscriptionTier', 'subscriptionCredits', 'prepaidCredits',
+          'stripeCustomerId', 'stripeSubscriptionId',
+          'currentPeriodStart', 'currentPeriodEnd', 'creditEpoch'
+        ]);
+      allow update: if isOwner(userId)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'subscriptionTier', 'subscriptionCredits', 'prepaidCredits',
+          'stripeCustomerId', 'stripeSubscriptionId',
+          'currentPeriodEnd', 'currentPeriodStart', 'creditEpoch'
+        ]);
       allow delete: if false; // Prevent deletion through client
 
       // User's rivers (conversation threads)
@@ -28,12 +48,18 @@ service cloud.firestore {
         allow delete: if isOwner(userId);
       }
 
-      // User's settings (includes encrypted API keys)
+      // User's settings
       match /settings/{settingId} {
         allow read: if isOwner(userId);
         allow create: if isOwner(userId);
         allow update: if isOwner(userId);
         allow delete: if isOwner(userId);
+      }
+
+      // Usage tracking (read-only for users, write via Cloud Functions)
+      match /usage/{monthId} {
+        allow read: if isOwner(userId);
+        allow write: if false; // Only Cloud Functions can write
       }
 
       // Credit transactions (read-only for users, write via Cloud Functions)
@@ -43,20 +69,17 @@ service cloud.firestore {
         allow update: if false; // Immutable
         allow delete: if false; // Cannot delete transactions
       }
-
-      // User credits balance
-      match /credits/{creditDoc} {
-        allow read: if isOwner(userId);
-        allow create: if false; // Only Cloud Functions can create
-        allow update: if false; // Only Cloud Functions can update
-        allow delete: if false;
-      }
     }
 
-    // Subscription tier information (public read, admin write)
-    match /subscriptionTiers/{tierId} {
-      allow read: if true; // Anyone can read tier information
+    // Tier/config information (public read, admin write)
+    match /config/{configId} {
+      allow read: if true; // Anyone can read config
       allow write: if false; // Only admins via Cloud Functions
+    }
+
+    // Stripe webhook idempotency tracking (Cloud Functions only)
+    match /processed_events/{eventId} {
+      allow read, write: if false; // Only Cloud Functions
     }
 
     // Block all other access
