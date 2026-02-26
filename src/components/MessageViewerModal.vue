@@ -1,5 +1,5 @@
 <template>
-  <div v-if="isOpen && message" class="modal-backdrop" @click.self="emit('close')">
+  <div v-if="isOpen && message" class="modal-backdrop z-[200]" @click.self="emit('close')">
     <div class="modal-content w-[800px] max-h-[80vh] p-8 overflow-y-auto">
       <!-- Header -->
       <div class="flex justify-between items-start mb-5">
@@ -7,9 +7,9 @@
           <div class="flex items-center gap-2.5 mb-2.5">
             <span
               class="px-2.5 py-1 rounded-md text-[10px] font-semibold uppercase tracking-wide"
-              :style="message.type === 'user' 
-                ? 'background: var(--color-primary-muted); color: var(--color-primary); border: 1px solid var(--color-primary);' 
-                : 'background: var(--color-accent); opacity: 0.2; color: var(--color-accent); border: 1px solid var(--color-accent);'"
+              :style="message.type === 'user'
+                ? 'background: var(--color-primary-muted); color: var(--color-primary); border: 1px solid var(--color-primary);'
+                : 'background: rgba(162, 89, 255, 0.1); color: var(--color-accent); border: 1px solid var(--color-accent);'"
             >
               {{ message.type === 'user' ? 'USER' : 'AI' }}
             </span>
@@ -57,7 +57,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, watch, onUnmounted } from 'vue';
 import type { MessageNode } from '../types';
 import { renderMarkdown } from '../utils/chat';
 
@@ -74,6 +74,25 @@ const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
 const copied = ref(false);
+let copyTimeout: ReturnType<typeof setTimeout> | null = null;
+
+// Reset copied state when modal closes
+watch(() => props.isOpen, (open) => {
+  if (!open) {
+    copied.value = false;
+    if (copyTimeout) {
+      clearTimeout(copyTimeout);
+      copyTimeout = null;
+    }
+  }
+});
+
+onUnmounted(() => {
+  if (copyTimeout) {
+    clearTimeout(copyTimeout);
+    copyTimeout = null;
+  }
+});
 
 function formatTimestamp(timestamp: number): string {
   const date = new Date(timestamp);
@@ -82,11 +101,16 @@ function formatTimestamp(timestamp: number): string {
 
 function handleCopy() {
   if (props.message) {
-    navigator.clipboard.writeText(props.message.content);
-    copied.value = true;
-    setTimeout(() => {
-      copied.value = false;
-    }, 2000);
+    navigator.clipboard.writeText(props.message.content).then(() => {
+      copied.value = true;
+      if (copyTimeout) clearTimeout(copyTimeout);
+      copyTimeout = setTimeout(() => {
+        copied.value = false;
+        copyTimeout = null;
+      }, 2000);
+    }).catch(() => {
+      // Clipboard API failed silently
+    });
   }
 }
 </script>

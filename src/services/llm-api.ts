@@ -105,8 +105,21 @@ export class LLMAPIService {
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        const errorMessage = error.error || `API error: ${response.status}`;
+        let errorMessage = `API error: ${response.status}`;
+        try {
+          const error = await response.json();
+          errorMessage = error.error || errorMessage;
+        } catch {
+          // Response body is not JSON (e.g. HTML error page)
+          try {
+            const text = await response.text();
+            if (text && text.length < 200) {
+              errorMessage = text;
+            }
+          } catch {
+            // Ignore - use default error message
+          }
+        }
 
         captureException(new Error(errorMessage), {
           context: 'proxy_api',

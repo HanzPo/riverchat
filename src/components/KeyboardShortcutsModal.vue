@@ -1,5 +1,5 @@
 <template>
-  <div v-if="isOpen" class="modal-overlay" @click.self="$emit('close')">
+  <div v-if="isOpen" class="modal-overlay z-[200]" @click.self="$emit('close')">
     <div class="modal-container">
       <div class="modal-header">
         <h2 class="modal-title">⌨️ Keyboard Shortcuts</h2>
@@ -217,7 +217,6 @@ const ctrlKey = computed(() => {
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 1000;
   animation: fadeIn 0.15s var(--ease-in-out);
 }
 

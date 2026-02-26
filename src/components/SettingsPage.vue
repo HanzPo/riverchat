@@ -1,5 +1,5 @@
 <template>
-  <div class="fixed inset-0 flex z-50" style="background: var(--color-background);">
+  <div class="fixed inset-0 flex z-[100]" style="background: var(--color-background);">
     <!-- Sidebar with Tabs -->
     <div class="w-64 border-r flex flex-col" style="border-color: var(--color-border); background: var(--color-background-secondary);">
       <!-- Back Button -->

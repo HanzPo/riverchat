@@ -18,13 +18,13 @@
     <Teleport to="body">
       <div
         v-if="isOpen"
-        class="fixed inset-0 z-[9998]"
+        class="fixed inset-0 z-[400]"
         @click="isOpen = false"
       />
       <div
         v-if="isOpen"
         ref="menuRef"
-        class="fixed z-[9999] w-[280px] max-h-[360px] overflow-y-auto rounded-lg shadow-xl py-1"
+        class="fixed z-[400] w-[280px] max-h-[360px] overflow-y-auto rounded-lg shadow-xl py-1"
         :style="menuStyle"
         style="background: var(--color-background); border: 1px solid var(--color-border);"
       >
@@ -122,11 +122,15 @@ watch(isOpen, async (open) => {
     await nextTick();
     const rect = dropdownRef.value.getBoundingClientRect();
     const menuHeight = 360;
+    const menuWidth = 280;
     const spaceBelow = window.innerHeight - rect.bottom - 8;
     const top = spaceBelow >= menuHeight ? rect.bottom + 4 : rect.top - menuHeight - 4;
+    // Clamp left so menu doesn't overflow right edge of viewport
+    const maxLeft = window.innerWidth - menuWidth - 8;
+    const left = Math.max(8, Math.min(rect.left, maxLeft));
     menuStyle.value = {
       top: `${Math.max(8, top)}px`,
-      left: `${rect.left}px`,
+      left: `${left}px`,
     };
   }
 });

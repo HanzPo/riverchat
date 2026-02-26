@@ -35,7 +35,7 @@
     <!-- Selection Rectangle -->
     <div
       v-if="selectionBox.active"
-      class="selection-rectangle"
+      class="selection-rectangle z-10"
       :style="{
         left: `${selectionBox.x}px`,
         top: `${selectionBox.y}px`,
@@ -47,7 +47,7 @@
     <!-- Context Menu -->
     <div
       v-if="contextMenu.visible"
-      class="context-menu"
+      class="context-menu z-[300]"
       :style="{
         left: `${contextMenu.x}px`,
         top: `${contextMenu.y}px`,
@@ -247,7 +247,7 @@ const flowEdges = computed<VueFlowEdge[]>(() => {
   const result: VueFlowEdge[] = [];
   
   Object.values(props.nodes).forEach((node) => {
-    if (node.parentId) {
+    if (node.parentId && props.nodes[node.parentId]) {
       result.push({
         id: `${node.parentId}-${node.id}`,
         source: node.parentId,
@@ -498,19 +498,30 @@ function handleNodeDoubleClick(event: any) {
   }
 }
 
+function clampMenuPosition(x: number, y: number, menuWidth: number = 220, menuHeight: number = 250): { x: number; y: number } {
+  const maxX = window.innerWidth - menuWidth - 8;
+  const maxY = window.innerHeight - menuHeight - 8;
+  return {
+    x: Math.max(8, Math.min(x, maxX)),
+    y: Math.max(8, Math.min(y, maxY)),
+  };
+}
+
 function handleNodeContextMenu(event: any) {
   const mouseEvent = event.event || event;
   const node = event.node?.data || event.data;
-  
+
   if (node && mouseEvent) {
     // Check if multiple nodes are selected
     const selectedNodes = getSelectedNodes.value || [];
     const selectedNodesData = selectedNodes.map(n => n.data as MessageNode);
-    
+
+    const pos = clampMenuPosition(mouseEvent.clientX, mouseEvent.clientY);
+
     contextMenu.value = {
       visible: true,
-      x: mouseEvent.clientX,
-      y: mouseEvent.clientY,
+      x: pos.x,
+      y: pos.y,
       node,
       selectedNodes: selectedNodesData.length > 1 ? selectedNodesData : [],
     };
@@ -529,14 +540,16 @@ function handlePaneContextMenu(event: any) {
   if (isRightDragging.value) {
     return;
   }
-  
+
   const mouseEvent = event.event || event;
-  
+
   if (mouseEvent) {
+    const pos = clampMenuPosition(mouseEvent.clientX, mouseEvent.clientY, 220, 60);
+
     contextMenu.value = {
       visible: true,
-      x: mouseEvent.clientX,
-      y: mouseEvent.clientY,
+      x: pos.x,
+      y: pos.y,
       node: null, // No node selected for pane context menu
       selectedNodes: [],
     };
@@ -800,7 +813,6 @@ onUnmounted(() => {
   border: 2px solid rgba(74, 158, 255, 0.8);
   background: rgba(74, 158, 255, 0.15);
   pointer-events: none;
-  z-index: 1000;
   backdrop-filter: blur(2px);
 }
 </style>

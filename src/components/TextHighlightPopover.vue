@@ -1,7 +1,7 @@
 <template>
   <div
     v-if="visible"
-    class="text-highlight-popover"
+    class="text-highlight-popover z-[600]"
     :style="{
       left: `${position.x}px`,
       top: `${position.y}px`,
@@ -35,7 +35,6 @@ defineEmits<Emits>();
 <style scoped>
 .text-highlight-popover {
   position: fixed;
-  z-index: 10000;
   display: flex;
   gap: 4px;
   background: var(--color-background-elevated);

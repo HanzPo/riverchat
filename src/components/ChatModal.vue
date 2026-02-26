@@ -1,5 +1,5 @@
 <template>
-  <div v-if="isOpen" class="fixed inset-0 flex flex-col" style="background: var(--color-background); z-index: 1000;">
+  <div v-if="isOpen" class="fixed inset-0 flex flex-col z-[200]" style="background: var(--color-background);">
     <!-- Floating Back Button -->
     <button
       @click="emit('close')"
@@ -430,6 +430,15 @@ const selectedUserMessage = computed(() => {
   return props.path.find(msg => msg.id === props.selectedNodeId && msg.type === 'user') || null;
 });
 
+// Clear branch context and popover when switching nodes
+watch(
+  () => props.selectedNodeId,
+  () => {
+    clearBranchContext();
+    highlightPopover.value.visible = false;
+  }
+);
+
 // Scroll to bottom when path changes
 watch(
   () => props.path,
@@ -543,16 +552,13 @@ function handleTextSelection(event: MouseEvent, nodeId: string) {
       if (rect && rect.width > 0 && rect.height > 0) {
         isSelecting = true;
         
-        // Position popover to the left of the selection
-        // Use the left edge of the selection
-        const leftX = rect.left;
-        const topY = rect.top + window.scrollY;
-        
+        // Position popover at the left edge of selection
+        // Use viewport-relative coords since popover is position:fixed
         highlightPopover.value = {
           visible: true,
           position: {
-            x: leftX,
-            y: topY,
+            x: rect.left,
+            y: rect.top,
           },
           selectedText,
           sourceNodeId: nodeId,
