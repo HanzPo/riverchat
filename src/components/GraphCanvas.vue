@@ -363,7 +363,7 @@ function startSelectionBox(event: MouseEvent) {
 }
 
 function preventContextMenu(event: Event) {
-  if (isRightDragging.value) {
+  if (isRightDragging.value || Date.now() - lastDragEndTime < 200) {
     event.preventDefault();
     event.stopPropagation();
   }
