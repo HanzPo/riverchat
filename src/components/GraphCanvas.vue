@@ -544,14 +544,21 @@ function handlePaneContextMenu(event: any) {
   const mouseEvent = event.event || event;
 
   if (mouseEvent) {
-    const pos = clampMenuPosition(mouseEvent.clientX, mouseEvent.clientY, 220, 60);
+    // Check if multiple nodes are currently selected
+    const selectedNodes = getSelectedNodes.value || [];
+    const selectedNodesData = selectedNodes.length > 1
+      ? selectedNodes.map(n => n.data as MessageNode)
+      : [];
+
+    const menuHeight = selectedNodesData.length > 1 ? 100 : 60;
+    const pos = clampMenuPosition(mouseEvent.clientX, mouseEvent.clientY, 220, menuHeight);
 
     contextMenu.value = {
       visible: true,
       x: pos.x,
       y: pos.y,
-      node: null, // No node selected for pane context menu
-      selectedNodes: [],
+      node: null,
+      selectedNodes: selectedNodesData,
     };
   }
 }
