@@ -105,6 +105,9 @@ export class AuthService {
       if (error.code === 'auth/cancelled-popup-request') {
         throw new Error('Sign-in cancelled. Please try again.');
       }
+      if (error.code === 'auth/credential-already-in-use') {
+        throw error;
+      }
 
       throw new Error(this.getAuthErrorMessage(error.code));
     }

@@ -146,12 +146,15 @@ async function handleGoogleSignIn(forceSignIn: boolean = false) {
   try {
     await AuthService.signInWithGoogle(forceSignIn);
 
-    // Migrate local data to Firestore after Google sign-in
-    try {
-      await FirestoreStorageService.migrateLocalDataToFirestore();
-    } catch (migrationError) {
-      console.error('Migration error:', migrationError);
-      // Don't block sign-in if migration fails
+    // Migrate local data to Firestore after Google sign-in (skip for force sign-in,
+    // since the user was told their anonymous data would not carry over)
+    if (!forceSignIn) {
+      try {
+        await FirestoreStorageService.migrateLocalDataToFirestore();
+      } catch (migrationError) {
+        console.error('Migration error:', migrationError);
+        // Don't block sign-in if migration fails
+      }
     }
 
     // Success! Close modal and notify parent
