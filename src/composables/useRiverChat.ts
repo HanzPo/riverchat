@@ -11,10 +11,10 @@ import { usePostHog, captureException } from './usePostHog';
 function debounce<T extends (...args: any[]) => any>(
   func: T,
   wait: number
-): (...args: Parameters<T>) => void {
+): ((...args: Parameters<T>) => void) & { cancel: () => void } {
   let timeout: ReturnType<typeof setTimeout> | null = null;
 
-  return function executedFunction(...args: Parameters<T>) {
+  const executedFunction = function(...args: Parameters<T>) {
     const later = () => {
       timeout = null;
       func(...args);
@@ -25,6 +25,15 @@ function debounce<T extends (...args: any[]) => any>(
     }
     timeout = setTimeout(later, wait);
   };
+
+  executedFunction.cancel = function() {
+    if (timeout) {
+      clearTimeout(timeout);
+      timeout = null;
+    }
+  };
+
+  return executedFunction;
 }
 
 // Global state
@@ -589,6 +598,7 @@ export function useRiverChat() {
     }
     isLoading.value = true;
     isInitializing.value = true; // Prevent auto-save during load
+    debouncedSaveSettings.cancel(); // Cancel any pending debounced save to prevent stale writes
     try {
       // Load settings from cache first for instant UI, then sync in background
       console.log('[useRiverChat] Loading settings from storage...');

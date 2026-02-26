@@ -432,6 +432,9 @@ onMounted(async () => {
   // so cloud functions (streamChat, getBalance, etc.) work immediately
   if (!auth.currentUser) {
     await AuthService.signInAnonymouslyIfNeeded();
+    // Refresh balance now that we have an authenticated session
+    // (the initial initialize() ran without auth, so balance is stale)
+    await subscription.refreshBalance();
   }
 
   // Listen to authentication state changes

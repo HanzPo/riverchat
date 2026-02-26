@@ -398,6 +398,7 @@ watch(canEnableWebSearch, (canEnable) => {
 });
 
 function handleModelSelect(index: number, modelId: string) {
+  if (selectedModelIds.value.some((id, i) => id === modelId && i !== index)) return;
   const newIds = [...selectedModelIds.value];
   newIds[index] = modelId;
   selectedModelIds.value = newIds;
