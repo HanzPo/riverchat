@@ -17,6 +17,7 @@
           <p class="text-xs leading-relaxed" style="color: var(--color-text-secondary);">
             You get <strong>$2.00 in free credits</strong> every month to chat with budget AI models.
             No credit card required! Simply close this modal and create your first river.
+            <strong>Sign up with Google anytime</strong> to save your conversations permanently.
           </p>
         </div>
 

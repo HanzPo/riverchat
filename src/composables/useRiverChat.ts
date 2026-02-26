@@ -1,10 +1,9 @@
 import { ref, computed, watch } from 'vue';
 import { v4 as uuidv4 } from 'uuid';
 import type { River, MessageNode, LLMModel, Settings } from '../types';
-import { getDefaultEnabledModelsRecord } from '../types';
+import { DEFAULT_MODEL_ID } from '../types';
 import { FirestoreStorageService } from '../services/firestore-storage';
 import { LLMAPIService } from '../services/llm-api';
-import { sortModels } from '../services/openrouter';
 import { useSubscription } from './useSubscription';
 import { usePostHog, captureException } from './usePostHog';
 
@@ -12,10 +11,10 @@ import { usePostHog, captureException } from './usePostHog';
 function debounce<T extends (...args: any[]) => any>(
   func: T,
   wait: number
-): (...args: Parameters<T>) => void {
+): ((...args: Parameters<T>) => void) & { cancel: () => void } {
   let timeout: ReturnType<typeof setTimeout> | null = null;
 
-  return function executedFunction(...args: Parameters<T>) {
+  const executedFunction = function(...args: Parameters<T>) {
     const later = () => {
       timeout = null;
       func(...args);
@@ -26,11 +25,20 @@ function debounce<T extends (...args: any[]) => any>(
     }
     timeout = setTimeout(later, wait);
   };
+
+  executedFunction.cancel = function() {
+    if (timeout) {
+      clearTimeout(timeout);
+      timeout = null;
+    }
+  };
+
+  return executedFunction;
 }
 
 // Global state
 const currentRiver = ref<River | null>(null);
-const settings = ref<Settings>({ lastUsedModel: null, enabledModels: {}, lastChatSelectedModels: [], lastModelRefresh: undefined });
+const settings = ref<Settings>({ lastUsedModelId: null, selectedModelIds: [], lastModelRefresh: undefined });
 const selectedNodeId = ref<string | null>(null);
 const allRivers = ref<River[]>([]);
 const isLoading = ref(false);
@@ -327,7 +335,7 @@ export function useRiverChat() {
     selectedNodeId.value = aiNode.id;
 
     // Update last used model
-    settings.value.lastUsedModel = model;
+    settings.value.lastUsedModelId = model.id;
 
     const analytics = usePostHog();
     const startTime = Date.now();
@@ -576,9 +584,21 @@ export function useRiverChat() {
   }
 
   // Initialize - load data and subscription state
+  let pendingForceRefresh = false;
   async function initialize(forceRefresh: boolean = false): Promise<void> {
+    // If already loading, queue a force refresh to run after the current one completes
+    if (isLoading.value) {
+      if (forceRefresh) {
+        console.log('[useRiverChat] Initialize already in progress, queuing force refresh');
+        pendingForceRefresh = true;
+      } else {
+        console.log('[useRiverChat] Initialize already in progress, skipping');
+      }
+      return;
+    }
     isLoading.value = true;
     isInitializing.value = true; // Prevent auto-save during load
+    debouncedSaveSettings.cancel(); // Cancel any pending debounced save to prevent stale writes
     try {
       // Load settings from cache first for instant UI, then sync in background
       console.log('[useRiverChat] Loading settings from storage...');
@@ -591,11 +611,11 @@ export function useRiverChat() {
         subscription.refreshModels(),
       ]);
 
-      // If models loaded, set up default enabled models if needed
+      // Set default selected model if none
       if (subscription.availableModels.value.length > 0) {
-        const sorted = sortModels([...subscription.availableModels.value]);
-        if (!settings.value.enabledModels || Object.keys(settings.value.enabledModels).length === 0) {
-          settings.value.enabledModels = getDefaultEnabledModelsRecord(sorted);
+        if (!settings.value.selectedModelIds || settings.value.selectedModelIds.length === 0) {
+          const defaultModel = subscription.availableModels.value.find(m => m.id === DEFAULT_MODEL_ID);
+          settings.value.selectedModelIds = [defaultModel?.id ?? subscription.availableModels.value[0]!.id];
           await FirestoreStorageService.saveSettings(settings.value);
         }
         settings.value.lastModelRefresh = Date.now();
@@ -615,6 +635,13 @@ export function useRiverChat() {
       // Enable auto-save after initialization complete
       isInitializing.value = false;
       console.log('[useRiverChat] Initialization complete, auto-save enabled');
+
+      // If a force refresh was queued while we were loading, run it now
+      if (pendingForceRefresh) {
+        console.log('[useRiverChat] Running queued force refresh');
+        pendingForceRefresh = false;
+        await initialize(true);
+      }
     }
   }
 
