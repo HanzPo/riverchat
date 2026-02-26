@@ -35,10 +35,22 @@
         </p>
       </div>
 
+      <!-- Account Conflict Warning -->
+      <div
+        v-if="showAccountConflict"
+        class="mb-4 rounded-lg p-3"
+        style="background: var(--color-warning-bg, #fff8e1); border: 1px solid var(--color-warning, #f9a825);"
+      >
+        <p class="text-xs leading-relaxed font-medium" style="color: var(--color-text-primary);">
+          This Google account is already registered. Signing in will switch to that account and your current conversations and credits will not be carried over.
+        </p>
+      </div>
+
       <!-- Google OAuth Button -->
       <button
+        v-if="!showAccountConflict"
         type="button"
-        @click="handleGoogleSignIn"
+        @click="handleGoogleSignIn()"
         class="btn-material w-full mb-4 flex items-center justify-center gap-3"
         :disabled="isLoading"
         style="padding: 10px 16px; font-weight: 600; background: white; color: #1f1f1f; border: 1px solid #e0e0e0;"
@@ -52,8 +64,31 @@
         {{ isLoading ? 'Signing in...' : (isAnonymous ? 'Sign up with Google' : 'Sign in with Google') }}
       </button>
 
+      <!-- Account conflict actions -->
+      <template v-if="showAccountConflict">
+        <button
+          type="button"
+          @click="handleGoogleSignIn(true)"
+          class="btn-material w-full mb-2"
+          :disabled="isLoading"
+          style="padding: 10px 16px; font-weight: 600;"
+        >
+          {{ isLoading ? 'Signing in...' : 'Sign in anyway' }}
+        </button>
+        <button
+          type="button"
+          @click="showAccountConflict = false"
+          class="btn-material w-full mb-4"
+          :disabled="isLoading"
+          style="padding: 10px 16px;"
+        >
+          Cancel
+        </button>
+      </template>
+
       <!-- Cancel button -->
       <button
+        v-if="!showAccountConflict"
         type="button"
         @click="emit('close')"
         class="btn-material w-full"
@@ -87,6 +122,7 @@ const emit = defineEmits<Emits>();
 
 const errorMessage = ref('');
 const isLoading = ref(false);
+const showAccountConflict = ref(false);
 const isAnonymous = computed(() => auth.currentUser?.isAnonymous ?? false);
 
 // Reset form when modal opens
@@ -95,18 +131,20 @@ watch(
   (isOpen) => {
     if (isOpen) {
       errorMessage.value = '';
+      showAccountConflict.value = false;
     }
   }
 );
 
-async function handleGoogleSignIn() {
+async function handleGoogleSignIn(forceSignIn: boolean = false) {
   if (isLoading.value) return;
 
   errorMessage.value = '';
+  showAccountConflict.value = false;
   isLoading.value = true;
 
   try {
-    await AuthService.signInWithGoogle();
+    await AuthService.signInWithGoogle(forceSignIn);
 
     // Migrate local data to Firestore after Google sign-in
     try {
@@ -119,15 +157,18 @@ async function handleGoogleSignIn() {
     // Success! Close modal and notify parent
     emit('authenticated');
     emit('close');
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'An error occurred';
-
-    // Don't show error if user just closed the popup
-    if (message.includes('cancelled') || message.includes('closed the popup')) {
-      // Silent cancellation - just reset loading state
-      errorMessage.value = '';
+  } catch (error: any) {
+    if (error.code === 'auth/credential-already-in-use') {
+      showAccountConflict.value = true;
     } else {
-      errorMessage.value = message;
+      const message = error instanceof Error ? error.message : 'An error occurred';
+
+      // Don't show error if user just closed the popup
+      if (message.includes('cancelled') || message.includes('closed the popup')) {
+        errorMessage.value = '';
+      } else {
+        errorMessage.value = message;
+      }
     }
   } finally {
     isLoading.value = false;

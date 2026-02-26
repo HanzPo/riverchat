@@ -31,7 +31,7 @@ export interface UserProfile {
 }
 
 export class AuthService {
-  static async signInWithGoogle(): Promise<UserCredential> {
+  static async signInWithGoogle(forceSignIn: boolean = false): Promise<UserCredential> {
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
@@ -40,21 +40,28 @@ export class AuthService {
       let userCredential: UserCredential;
       let wasAnonymous = false;
 
-      if (currentUser && currentUser.isAnonymous) {
+      if (currentUser && currentUser.isAnonymous && !forceSignIn) {
         // Link anonymous account to Google — preserves UID and all data
         try {
           userCredential = await linkWithPopup(currentUser, provider);
           wasAnonymous = true;
         } catch (linkError: any) {
           if (linkError.code === 'auth/credential-already-in-use') {
-            // Google account already exists as a separate user — sign in directly
-            userCredential = await signInWithPopup(auth, provider);
+            // Google account already exists — let the user decide
+            const error = new Error(
+              'This Google account is already registered. Signing in will switch to that account and your current conversations and credits will not be carried over.'
+            );
+            (error as any).code = 'auth/credential-already-in-use';
+            throw error;
           } else {
             throw linkError;
           }
         }
       } else {
         userCredential = await signInWithPopup(auth, provider);
+        if (forceSignIn) {
+          wasAnonymous = true;
+        }
       }
 
       const existingProfile = await this.getUserProfile(userCredential.user.uid);
