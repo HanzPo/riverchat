@@ -119,7 +119,7 @@ export class AuthService {
       CacheService.cacheAuthState(user);
 
       const analytics = usePostHog();
-      analytics.identify(user.uid, { isAnonymous: true });
+      analytics.identify(user.uid);
       analytics.capture('anonymous_user_created');
 
       return user;
