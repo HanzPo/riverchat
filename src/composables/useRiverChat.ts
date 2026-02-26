@@ -575,10 +575,16 @@ export function useRiverChat() {
   }
 
   // Initialize - load data and subscription state
+  let pendingForceRefresh = false;
   async function initialize(forceRefresh: boolean = false): Promise<void> {
-    // Prevent concurrent initializations (e.g. handleAuthenticated + onAuthStateChanged racing)
+    // If already loading, queue a force refresh to run after the current one completes
     if (isLoading.value) {
-      console.log('[useRiverChat] Initialize already in progress, skipping');
+      if (forceRefresh) {
+        console.log('[useRiverChat] Initialize already in progress, queuing force refresh');
+        pendingForceRefresh = true;
+      } else {
+        console.log('[useRiverChat] Initialize already in progress, skipping');
+      }
       return;
     }
     isLoading.value = true;
@@ -619,6 +625,13 @@ export function useRiverChat() {
       // Enable auto-save after initialization complete
       isInitializing.value = false;
       console.log('[useRiverChat] Initialization complete, auto-save enabled');
+
+      // If a force refresh was queued while we were loading, run it now
+      if (pendingForceRefresh) {
+        console.log('[useRiverChat] Running queued force refresh');
+        pendingForceRefresh = false;
+        await initialize(true);
+      }
     }
   }
 
