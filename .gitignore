@@ -38,6 +38,7 @@ build/
 # OS
 .DS_Store
 Thumbs.db
+.firebase
 .firebaserc
 .claude
 
