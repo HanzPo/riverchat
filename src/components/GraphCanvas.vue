@@ -177,6 +177,7 @@ const selectionBox = ref({
   height: 0,
 });
 const isRightDragging = ref(false);
+let lastDragEndTime = 0;
 
 // Watch for selection changes and emit to parent
 watch(
@@ -409,18 +410,14 @@ function endSelectionBox(event: MouseEvent) {
     // Prevent context menu from showing
     event.preventDefault();
     event.stopPropagation();
-    
+
     // Select nodes within the selection box
     selectNodesInBox();
-    
-    // Set a flag to prevent context menu from showing
-    // We'll clear this flag after a short delay
-    setTimeout(() => {
-      isRightDragging.value = false;
-    }, 100);
-  } else {
-    isRightDragging.value = false;
+
+    lastDragEndTime = Date.now();
   }
+
+  isRightDragging.value = false;
   
   // Reset selection box
   selectionBox.value.active = false;
@@ -537,7 +534,7 @@ function handlePaneClick() {
 
 function handlePaneContextMenu(event: any) {
   // Don't show context menu if we just completed a drag selection
-  if (isRightDragging.value) {
+  if (isRightDragging.value || Date.now() - lastDragEndTime < 200) {
     return;
   }
 
