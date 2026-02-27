@@ -1,5 +1,5 @@
 <template>
-  <div class="graph-canvas" ref="canvasContainer">
+  <div class="graph-canvas" ref="canvasContainer" @mousedown.right="trackRightMouseDown" @mousemove="trackMouseMove">
     <VueFlow
       v-model:nodes="flowNodes"
       v-model:edges="flowEdges"
@@ -178,6 +178,25 @@ const selectionBox = ref({
 });
 const isRightDragging = ref(false);
 let suppressNextContextMenu = false;
+let rightClickStart: { x: number; y: number } | null = null;
+let rightButtonDown = false;
+
+function trackRightMouseDown(event: MouseEvent) {
+  rightClickStart = { x: event.clientX, y: event.clientY };
+  rightButtonDown = true;
+  const onUp = () => { rightButtonDown = false; document.removeEventListener('mouseup', onUp); };
+  document.addEventListener('mouseup', onUp);
+}
+
+function trackMouseMove(event: MouseEvent) {
+  if (rightButtonDown && rightClickStart) {
+    const dx = event.clientX - rightClickStart.x;
+    const dy = event.clientY - rightClickStart.y;
+    if (dx * dx + dy * dy > 25) {
+      suppressNextContextMenu = true;
+    }
+  }
+}
 
 // Watch for selection changes and emit to parent
 watch(
@@ -483,6 +502,11 @@ function clampMenuPosition(x: number, y: number, menuWidth: number = 220, menuHe
 }
 
 function handleNodeContextMenu(event: any) {
+  if (suppressNextContextMenu) {
+    suppressNextContextMenu = false;
+    return;
+  }
+
   const mouseEvent = event.event || event;
   const node = event.node?.data || event.data;
 
