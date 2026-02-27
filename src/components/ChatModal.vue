@@ -1,5 +1,5 @@
 <template>
-  <div v-if="isOpen" class="fixed inset-0 flex flex-col" style="background: var(--color-background); z-index: 1000;">
+  <div v-if="isOpen" class="fixed inset-0 flex flex-col z-[200]" style="background: var(--color-background);">
     <!-- Floating Back Button -->
     <button
       @click="emit('close')"
@@ -117,9 +117,10 @@
                 <span class="font-medium">
                   {{ formatTime(message.timestamp) }}
                 </span>
-                <span v-if="message.state === 'error'" class="text-error font-bold flex items-center gap-1">
+                <span v-if="message.state === 'error'" class="error-badge-wrapper relative text-error font-bold flex items-center gap-1">
                   <AlertTriangle :size="12" />
                   <span>Error</span>
+                  <span v-if="message.error" class="error-tooltip">{{ message.error }}</span>
                 </span>
               </div>
             </div>
@@ -366,6 +367,7 @@ const branchContext = ref({
 let isSelecting = false;
 let isInitializing = true;
 let isSyncingFromParent = false;
+let mountListenerTimeout: ReturnType<typeof setTimeout> | null = null;
 
 // Initialize from settings
 watch(
@@ -381,6 +383,19 @@ watch(
     nextTick(() => { isInitializing = false; isSyncingFromParent = false; });
   },
   { immediate: true }
+);
+
+// Set default model when available models load (handles race with settings)
+watch(
+  () => subscription.availableModels.value,
+  (models) => {
+    if (models.length > 0 && selectedModelIds.value.length === 0) {
+      isSyncingFromParent = true;
+      const defaultModel = models.find(m => m.id === DEFAULT_MODEL_ID);
+      selectedModelIds.value = [defaultModel?.id ?? models[0]!.id];
+      nextTick(() => { isSyncingFromParent = false; });
+    }
+  }
 );
 
 // Sync model changes back to parent
@@ -429,6 +444,15 @@ const selectedUserMessage = computed(() => {
   if (!props.selectedNodeId || props.path.length === 0) return null;
   return props.path.find(msg => msg.id === props.selectedNodeId && msg.type === 'user') || null;
 });
+
+// Clear branch context and popover when switching nodes
+watch(
+  () => props.selectedNodeId,
+  () => {
+    clearBranchContext();
+    highlightPopover.value.visible = false;
+  }
+);
 
 // Scroll to bottom when path changes
 watch(
@@ -543,16 +567,13 @@ function handleTextSelection(event: MouseEvent, nodeId: string) {
       if (rect && rect.width > 0 && rect.height > 0) {
         isSelecting = true;
         
-        // Position popover to the left of the selection
-        // Use the left edge of the selection
-        const leftX = rect.left;
-        const topY = rect.top + window.scrollY;
-        
+        // Position popover at the left edge of selection
+        // Use viewport-relative coords since popover is position:fixed
         highlightPopover.value = {
           visible: true,
           position: {
-            x: leftX,
-            y: topY,
+            x: rect.left,
+            y: rect.top,
           },
           selectedText,
           sourceNodeId: nodeId,
@@ -614,15 +635,19 @@ function handleDocumentClick(event: MouseEvent) {
 
 // Lifecycle hooks for event listener cleanup
 onMounted(() => {
-  // Add document click listener
-  // Use capture phase and a small delay to avoid interfering with selection
-  setTimeout(() => {
+  // Add document click listener with a small delay to avoid interfering with selection
+  mountListenerTimeout = setTimeout(() => {
+    mountListenerTimeout = null;
     document.addEventListener('mousedown', handleDocumentClick);
   }, 0);
 });
 
 onUnmounted(() => {
-  // Remove document click listener to prevent memory leaks
+  // Clear the pending timeout if unmount happens before it fires
+  if (mountListenerTimeout) {
+    clearTimeout(mountListenerTimeout);
+    mountListenerTimeout = null;
+  }
   document.removeEventListener('mousedown', handleDocumentClick);
 });
 </script>
@@ -781,5 +806,32 @@ onUnmounted(() => {
 
 .animate-slide-in {
   animation: slide-in 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Error tooltip */
+.error-tooltip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 6px);
+  right: 0;
+  background: var(--color-background);
+  color: var(--color-error);
+  border: 1px solid var(--color-error);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-width: 280px;
+  width: max-content;
+  z-index: 50;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.error-badge-wrapper:hover .error-tooltip {
+  display: block;
 }
 </style>

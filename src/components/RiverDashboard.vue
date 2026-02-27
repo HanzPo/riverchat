@@ -1,5 +1,5 @@
 <template>
-  <div v-if="isOpen" class="modal-backdrop" @click.self="emit('close')">
+  <div v-if="isOpen" class="modal-backdrop z-[200]" @click.self="emit('close')">
     <div class="modal-content w-[700px] max-h-[80vh] p-8 flex flex-col">
       <div class="mb-6">
         <h2 class="text-xl font-semibold mb-2" style="color: var(--color-text-primary); letter-spacing: -0.01em;">
@@ -48,11 +48,31 @@
           >
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 mb-1.5">
-                <h3 class="text-sm font-semibold overflow-hidden text-ellipsis whitespace-nowrap" style="color: var(--color-text-primary); letter-spacing: -0.01em;">
+                <!-- Inline rename input -->
+                <div v-if="editingRiverId === river.id" class="flex items-center gap-2 flex-1" @click.stop>
+                  <input
+                    ref="renameInput"
+                    v-model="editingRiverName"
+                    type="text"
+                    class="input-material text-sm font-semibold"
+                    style="padding: 2px 8px; height: 28px;"
+                    @keyup.enter="confirmRename"
+                    @keyup.escape="cancelRename"
+                    @blur="confirmRename"
+                  />
+                  <button @mousedown.prevent="confirmRename" class="btn-material" style="padding: 4px 6px;" title="Save">
+                    <Check :size="14" />
+                  </button>
+                  <button @mousedown.prevent="cancelRename" class="btn-material" style="padding: 4px 6px;" title="Cancel">
+                    <X :size="14" />
+                  </button>
+                </div>
+                <!-- Normal river name display -->
+                <h3 v-else class="text-sm font-semibold overflow-hidden text-ellipsis whitespace-nowrap" style="color: var(--color-text-primary); letter-spacing: -0.01em;">
                   {{ river.name }}
                 </h3>
                 <span
-                  v-if="river.id === activeRiverId"
+                  v-if="river.id === activeRiverId && editingRiverId !== river.id"
                   class="px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide"
                   style="background: var(--color-success-bg); color: var(--color-success); border: 1px solid var(--color-success);"
                 >
@@ -65,7 +85,7 @@
               </div>
             </div>
 
-            <div class="flex gap-2" @click.stop>
+            <div v-if="editingRiverId !== river.id" class="flex gap-2" @click.stop>
               <button
                 @click="handleRenameRiver(river)"
                 :disabled="isLoading"
@@ -120,9 +140,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, nextTick } from 'vue';
 import type { River } from '../types';
-import { Pencil, Trash2 } from 'lucide-vue-next';
+import { Pencil, Trash2, Check, X } from 'lucide-vue-next';
 import ConfirmationModal from './ConfirmationModal.vue';
 
 interface Props {
@@ -144,6 +164,8 @@ const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
 const newRiverName = ref('');
+const editingRiverId = ref<string | null>(null);
+const editingRiverName = ref('');
 const deleteConfirmation = ref({
   isOpen: false,
   riverId: '',
@@ -171,11 +193,37 @@ function handleOpenRiver(riverId: string) {
   emit('close');
 }
 
+const renameInput = ref<HTMLInputElement | null>(null);
+
 function handleRenameRiver(river: River) {
-  const newName = prompt('Enter new name:', river.name);
-  if (newName && newName.trim() && newName !== river.name) {
-    emit('rename', river.id, newName.trim());
+  editingRiverId.value = river.id;
+  editingRiverName.value = river.name;
+  nextTick(() => {
+    if (renameInput.value) {
+      // Handle ref array from v-for (Vue returns array of refs)
+      const input = Array.isArray(renameInput.value) ? renameInput.value[0] : renameInput.value;
+      if (input) {
+        input.focus();
+        input.select();
+      }
+    }
+  });
+}
+
+function confirmRename() {
+  if (!editingRiverId.value) return;
+  const trimmed = editingRiverName.value.trim();
+  const river = props.rivers.find(r => r.id === editingRiverId.value);
+  if (trimmed && river && trimmed !== river.name) {
+    emit('rename', editingRiverId.value, trimmed);
   }
+  editingRiverId.value = null;
+  editingRiverName.value = '';
+}
+
+function cancelRename() {
+  editingRiverId.value = null;
+  editingRiverName.value = '';
 }
 
 function handleDeleteRiver(river: River) {

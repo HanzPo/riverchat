@@ -9,7 +9,7 @@ const tier = ref<SubscriptionTier>('free');
 const subscriptionCredits = ref(0); // cents
 const prepaidCredits = ref(0); // cents
 const currentPeriodEnd = ref<number | null>(null);
-const availableModels = ref<LLMModel[]>([]);
+const availableModels = ref<LLMModel[]>(FALLBACK_MODELS);
 const isLoadingBalance = ref(false);
 const isLoadingModels = ref(false);
 
@@ -72,12 +72,11 @@ export function useSubscription() {
   async function refreshModels(): Promise<void> {
     isLoadingModels.value = true;
     try {
-      availableModels.value = await callGetModels();
+      const models = await callGetModels();
+      availableModels.value = models.length > 0 ? models : FALLBACK_MODELS;
     } catch (error) {
       console.error('[Subscription] Failed to load models from server, using fallback catalog:', error);
-      if (availableModels.value.length === 0) {
-        availableModels.value = FALLBACK_MODELS;
-      }
+      availableModels.value = FALLBACK_MODELS;
     } finally {
       isLoadingModels.value = false;
     }

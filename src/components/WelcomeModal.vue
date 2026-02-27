@@ -1,5 +1,5 @@
 <template>
-  <div v-if="isOpen" class="modal-backdrop" @click.self="onBackdropClick">
+  <div v-if="isOpen" class="modal-backdrop z-[200]" @click.self="onBackdropClick">
     <div class="modal-content w-[600px] p-8">
       <div class="mb-6">
         <h1 class="text-2xl font-semibold mb-3" style="color: var(--color-text-primary); letter-spacing: -0.02em;">

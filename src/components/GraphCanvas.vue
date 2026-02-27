@@ -35,7 +35,7 @@
     <!-- Selection Rectangle -->
     <div
       v-if="selectionBox.active"
-      class="selection-rectangle"
+      class="selection-rectangle z-10"
       :style="{
         left: `${selectionBox.x}px`,
         top: `${selectionBox.y}px`,
@@ -47,7 +47,7 @@
     <!-- Context Menu -->
     <div
       v-if="contextMenu.visible"
-      class="context-menu"
+      class="context-menu z-[300]"
       :style="{
         left: `${contextMenu.x}px`,
         top: `${contextMenu.y}px`,
@@ -177,6 +177,47 @@ const selectionBox = ref({
   height: 0,
 });
 const isRightDragging = ref(false);
+let rightButtonDown = false;
+let rightDragDetected = false;
+let rightClickStart: { x: number; y: number } | null = null;
+let pendingContextMenu: { type: 'pane' | 'node'; event: any } | null = null;
+
+function onDocMouseDown(event: MouseEvent) {
+  if (event.button === 2) {
+    rightButtonDown = true;
+    rightDragDetected = false;
+    rightClickStart = { x: event.clientX, y: event.clientY };
+    pendingContextMenu = null;
+  }
+}
+
+function onDocMouseMove(event: MouseEvent) {
+  if (rightButtonDown && rightClickStart && !rightDragDetected) {
+    const dx = event.clientX - rightClickStart.x;
+    const dy = event.clientY - rightClickStart.y;
+    if (dx * dx + dy * dy > 25) {
+      rightDragDetected = true;
+    }
+  }
+}
+
+function onDocMouseUp(event: MouseEvent) {
+  if (event.button === 2) {
+    rightButtonDown = false;
+    // Show the pending context menu only if no drag happened
+    if (pendingContextMenu && !isRightDragging.value && !rightDragDetected) {
+      const pending = pendingContextMenu;
+      pendingContextMenu = null;
+      if (pending.type === 'pane') {
+        showPaneContextMenu(pending.event);
+      } else {
+        showNodeContextMenu(pending.event);
+      }
+    } else {
+      pendingContextMenu = null;
+    }
+  }
+}
 
 // Watch for selection changes and emit to parent
 watch(
@@ -247,7 +288,7 @@ const flowEdges = computed<VueFlowEdge[]>(() => {
   const result: VueFlowEdge[] = [];
   
   Object.values(props.nodes).forEach((node) => {
-    if (node.parentId) {
+    if (node.parentId && props.nodes[node.parentId]) {
       result.push({
         id: `${node.parentId}-${node.id}`,
         source: node.parentId,
@@ -339,10 +380,10 @@ function layoutTree(
 function startSelectionBox(event: MouseEvent) {
   // Only start selection on right-click
   if (event.button !== 2) return;
-  
+
   const rect = canvasContainer.value?.getBoundingClientRect();
   if (!rect) return;
-  
+
   isRightDragging.value = false;
   
   selectionBox.value = {
@@ -358,15 +399,6 @@ function startSelectionBox(event: MouseEvent) {
   // Add event listeners
   document.addEventListener('mousemove', updateSelectionBox);
   document.addEventListener('mouseup', endSelectionBox);
-  document.addEventListener('contextmenu', preventContextMenu);
-}
-
-function preventContextMenu(event: Event) {
-  if (isRightDragging.value) {
-    event.preventDefault();
-    event.stopPropagation();
-  }
-  document.removeEventListener('contextmenu', preventContextMenu);
 }
 
 function updateSelectionBox(event: MouseEvent) {
@@ -399,36 +431,18 @@ function updateSelectionBox(event: MouseEvent) {
   }
 }
 
-function endSelectionBox(event: MouseEvent) {
+function endSelectionBox(_event: MouseEvent) {
   if (!selectionBox.value.active) return;
-  
-  const wasDragging = isRightDragging.value;
-  
-  // Only select nodes if we actually dragged
-  if (wasDragging) {
-    // Prevent context menu from showing
-    event.preventDefault();
-    event.stopPropagation();
-    
-    // Select nodes within the selection box
+
+  if (isRightDragging.value) {
     selectNodesInBox();
-    
-    // Set a flag to prevent context menu from showing
-    // We'll clear this flag after a short delay
-    setTimeout(() => {
-      isRightDragging.value = false;
-    }, 100);
-  } else {
-    isRightDragging.value = false;
   }
-  
-  // Reset selection box
+
+  isRightDragging.value = false;
   selectionBox.value.active = false;
-  
-  // Remove event listeners
+
   document.removeEventListener('mousemove', updateSelectionBox);
   document.removeEventListener('mouseup', endSelectionBox);
-  document.removeEventListener('contextmenu', preventContextMenu);
 }
 
 function selectNodesInBox() {
@@ -498,19 +512,38 @@ function handleNodeDoubleClick(event: any) {
   }
 }
 
+function clampMenuPosition(x: number, y: number, menuWidth: number = 220, menuHeight: number = 250): { x: number; y: number } {
+  const maxX = window.innerWidth - menuWidth - 8;
+  const maxY = window.innerHeight - menuHeight - 8;
+  return {
+    x: Math.max(8, Math.min(x, maxX)),
+    y: Math.max(8, Math.min(y, maxY)),
+  };
+}
+
 function handleNodeContextMenu(event: any) {
+  if (rightButtonDown) {
+    // Defer until mouseup to check if it was a drag
+    pendingContextMenu = { type: 'node', event };
+    return;
+  }
+  showNodeContextMenu(event);
+}
+
+function showNodeContextMenu(event: any) {
   const mouseEvent = event.event || event;
   const node = event.node?.data || event.data;
-  
+
   if (node && mouseEvent) {
-    // Check if multiple nodes are selected
     const selectedNodes = getSelectedNodes.value || [];
     const selectedNodesData = selectedNodes.map(n => n.data as MessageNode);
-    
+
+    const pos = clampMenuPosition(mouseEvent.clientX, mouseEvent.clientY);
+
     contextMenu.value = {
       visible: true,
-      x: mouseEvent.clientX,
-      y: mouseEvent.clientY,
+      x: pos.x,
+      y: pos.y,
       node,
       selectedNodes: selectedNodesData.length > 1 ? selectedNodesData : [],
     };
@@ -525,28 +558,46 @@ function handlePaneClick() {
 }
 
 function handlePaneContextMenu(event: any) {
-  // Don't show context menu if we just completed a drag selection
-  if (isRightDragging.value) {
+  if (rightButtonDown) {
+    // Defer until mouseup to check if it was a drag
+    pendingContextMenu = { type: 'pane', event };
     return;
   }
-  
+  showPaneContextMenu(event);
+}
+
+function showPaneContextMenu(event: any) {
   const mouseEvent = event.event || event;
-  
+
   if (mouseEvent) {
+    const selectedNodes = getSelectedNodes.value || [];
+    const selectedNodesData = selectedNodes.length > 1
+      ? selectedNodes.map(n => n.data as MessageNode)
+      : [];
+
+    const menuHeight = selectedNodesData.length > 1 ? 100 : 60;
+    const pos = clampMenuPosition(mouseEvent.clientX, mouseEvent.clientY, 220, menuHeight);
+
     contextMenu.value = {
       visible: true,
-      x: mouseEvent.clientX,
-      y: mouseEvent.clientY,
-      node: null, // No node selected for pane context menu
-      selectedNodes: [],
+      x: pos.x,
+      y: pos.y,
+      node: null,
+      selectedNodes: selectedNodesData,
     };
   }
 }
+
+let dragBatchTimeout: ReturnType<typeof setTimeout> | null = null;
 
 function handleNodeDragStart() {
   // Mark that dragging has started - this prevents syncFlowNodes from running
   isDragging.value = true;
   draggedNodes.value.clear();
+  if (dragBatchTimeout) {
+    clearTimeout(dragBatchTimeout);
+    dragBatchTimeout = null;
+  }
 }
 
 function handleNodeDrag() {
@@ -557,45 +608,47 @@ function handleNodeDrag() {
 async function handleNodeDragStop(event: any) {
   const nodeId = event.node?.id;
   const position = event.node?.position;
-  
+
   if (!nodeId || !position) return;
 
   // Get all currently selected nodes from VueFlow
   const selectedNodes = getSelectedNodes.value || [];
-  
+
   // If multiple nodes are selected, batch update all of them
   if (selectedNodes.length > 1) {
     // Add this node to the dragged nodes set
     draggedNodes.value.add(nodeId);
-    
-    // Check if we've received drag-stop events for all selected nodes
-    const allSelectedIds = selectedNodes.map(n => n.id);
-    const allDragged = allSelectedIds.every(id => draggedNodes.value.has(id));
-    
-    if (allDragged) {
-      // All selected nodes have finished dragging, collect all positions from VueFlow
+
+    // Use a short timeout to batch all dragStop events that arrive in
+    // the same frame, instead of waiting for every single selected node.
+    // This avoids getting stuck if VueFlow doesn't fire dragStop for
+    // all nodes (e.g., node was deselected during drag).
+    if (dragBatchTimeout) clearTimeout(dragBatchTimeout);
+    dragBatchTimeout = setTimeout(async () => {
+      dragBatchTimeout = null;
+      // Collect positions for all selected nodes from VueFlow's current state
       const updates = selectedNodes
         .filter(node => node.position)
         .map(node => ({
           nodeId: node.id,
           position: { x: node.position!.x, y: node.position!.y }
         }));
-      
+
       // Emit a single batch update event
       emit('update-positions-batch', updates);
-      
+
       // Clear the dragged nodes set
       draggedNodes.value.clear();
-      
+
       // Wait for Vue to process the update before allowing sync
       await nextTick();
       await nextTick(); // Double nextTick to ensure props have propagated
       isDragging.value = false;
-    }
+    }, 50);
   } else {
     // Single node drag - update immediately
     emit('update-position', nodeId, { x: position.x, y: position.y });
-    
+
     // Wait for Vue to process the update before allowing sync
     await nextTick();
     await nextTick(); // Double nextTick to ensure props have propagated
@@ -700,16 +753,21 @@ let cleanupSelectionListener: (() => void) | null = null;
 onMounted(() => {
   // Add click listener for closing context menu
   window.addEventListener('click', handleClickOutside);
-  
+
   // Add keyboard listener for node deletion
   window.addEventListener('keydown', handleKeyboardDelete);
-  
+
+  // Track right-click drag globally (capture phase to fire before Vue Flow)
+  document.addEventListener('mousedown', onDocMouseDown, true);
+  document.addEventListener('mousemove', onDocMouseMove, true);
+  document.addEventListener('mouseup', onDocMouseUp, true);
+
   // Find the Vue Flow pane element
   const paneElement = document.querySelector('.vue-flow__pane');
-  
+
   if (paneElement) {
     paneElement.addEventListener('mousedown', startSelectionBox as EventListener);
-    
+
     cleanupSelectionListener = () => {
       paneElement.removeEventListener('mousedown', startSelectionBox as EventListener);
     };
@@ -719,18 +777,28 @@ onMounted(() => {
 onUnmounted(() => {
   // Remove click listener
   window.removeEventListener('click', handleClickOutside);
-  
+
   // Remove keyboard listener
   window.removeEventListener('keydown', handleKeyboardDelete);
-  
+
+  // Remove right-click drag tracking
+  document.removeEventListener('mousedown', onDocMouseDown, true);
+  document.removeEventListener('mousemove', onDocMouseMove, true);
+  document.removeEventListener('mouseup', onDocMouseUp, true);
+
   if (cleanupSelectionListener) {
     cleanupSelectionListener();
   }
-  
+
   // Clean up any lingering event listeners
   document.removeEventListener('mousemove', updateSelectionBox);
   document.removeEventListener('mouseup', endSelectionBox);
-  document.removeEventListener('contextmenu', preventContextMenu);
+
+  // Cancel any pending drag batch timeout
+  if (dragBatchTimeout) {
+    clearTimeout(dragBatchTimeout);
+    dragBatchTimeout = null;
+  }
 });
 </script>
 
@@ -800,7 +868,6 @@ onUnmounted(() => {
   border: 2px solid rgba(74, 158, 255, 0.8);
   background: rgba(74, 158, 255, 0.15);
   pointer-events: none;
-  z-index: 1000;
   backdrop-filter: blur(2px);
 }
 </style>

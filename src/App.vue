@@ -18,7 +18,7 @@
           <Folder :size="14" />
           <span>Rivers</span>
         </button>
-        <button @click="handleSearch" class="btn-material p-2" title="Search (Ctrl+F)">
+        <button @click="handleSearch" class="btn-material p-2" title="Search">
           <Search :size="14" />
         </button>
         <button @click="showHelp = true" class="btn-material p-2" title="Keyboard Shortcuts (Ctrl+?)">
@@ -68,12 +68,11 @@
           @selection-change="handleSelectionChange"
         />
         
-        <!-- New Root Node Button (Floating - top right, shifts left with chat panel) -->
+        <!-- New Root Node Button (Floating - top right) -->
         <button
           v-if="currentRiver && !selectedNodeId && !isNewRootMode && !hasMultipleNodesSelected && !showSettings"
           @click="handleCreateRootNode"
-          class="fixed top-4 z-50 btn-material px-5 py-2.5 text-sm font-bold flex items-center gap-2 shadow-elevation-3"
-          :style="{ right: (selectedNodeId || isNewRootMode) && !hasMultipleNodesSelected ? `${chatPanelWidth + 16}px` : '16px' }"
+          class="fixed top-4 right-4 z-50 btn-material px-5 py-2.5 text-sm font-bold flex items-center gap-2 shadow-elevation-3"
         >
           <Plus :size="16" />
           <span>New Root Node</span>
@@ -107,7 +106,7 @@
       >
         <!-- Resize Handle -->
         <div 
-          class="resize-handle"
+          class="resize-handle z-10"
           @mousedown="startResize"
         ></div>
         
@@ -176,16 +175,38 @@
       @close="deleteConfirmation.isOpen = false"
     />
 
-    <ConfirmationModal
-      :is-open="editConfirmation.isOpen"
-      title="Edit and Resubmit?"
-      message="Editing this message will delete all responses below it. Are you sure you want to continue?"
-      confirm-text="Edit"
-      cancel-text="Cancel"
-      :is-dangerous="true"
-      @confirm="confirmEditResubmit"
-      @close="editConfirmation.isOpen = false"
-    />
+    <!-- Edit & Resubmit Modal -->
+    <div v-if="editConfirmation.isOpen" class="modal-backdrop z-[200]" @click.self="editConfirmation.isOpen = false">
+      <div class="modal-content w-[550px] p-7">
+        <h3 class="text-lg font-semibold mb-2" style="color: var(--color-text-primary); letter-spacing: -0.01em;">
+          Edit and Resubmit
+        </h3>
+        <p class="text-sm leading-relaxed mb-4 font-medium" style="color: var(--color-text-secondary);">
+          All responses below this message will be deleted and a new response will be generated.
+        </p>
+        <textarea
+          ref="editTextarea"
+          v-model="editConfirmation.content"
+          class="textarea-material"
+          style="min-height: 120px; max-height: 300px;"
+          @keydown.ctrl.enter="confirmEditResubmit"
+          @keydown.meta.enter="confirmEditResubmit"
+        ></textarea>
+        <div class="flex justify-end gap-3 mt-4">
+          <button @click="editConfirmation.isOpen = false" class="btn-material" style="padding: 8px 16px;">
+            Cancel
+          </button>
+          <button
+            @click="confirmEditResubmit"
+            :disabled="!editConfirmation.content.trim()"
+            class="btn-material"
+            style="padding: 8px 16px; font-weight: 600; background: var(--color-primary-muted); color: var(--color-primary); border-color: var(--color-primary);"
+          >
+            Resubmit
+          </button>
+        </div>
+      </div>
+    </div>
 
     <ConfirmationModal
       :is-open="deleteBatchConfirmation.isOpen"
@@ -228,12 +249,12 @@
     />
 
     <!-- Toast Notification -->
-    <div v-if="toast.visible && !showSettings" class="toast" :class="`toast-${toast.type}`">
+    <div v-if="toast.visible && !showSettings" class="toast z-[500]" :class="`toast-${toast.type}`">
       {{ toast.message }}
     </div>
 
     <!-- Loading Overlay -->
-    <div v-if="isLoading" class="loading-overlay">
+    <div v-if="isLoading" class="loading-overlay z-[700]">
       <div class="loading-content">
         <div class="loading-spinner"></div>
       </div>
@@ -242,7 +263,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, defineAsyncComponent } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch, nextTick, defineAsyncComponent } from 'vue';
 import { useRiverChat } from './composables/useRiverChat';
 import { usePostHog } from './composables/usePostHog';
 import type { MessageNode, LLMModel } from './types';
@@ -331,7 +352,9 @@ const deleteBatchConfirmation = ref({
 const editConfirmation = ref({
   isOpen: false,
   nodeId: '',
+  content: '',
 });
+const editTextarea = ref<HTMLTextAreaElement | null>(null);
 
 // Toast notifications
 const toast = ref({
@@ -474,7 +497,10 @@ onMounted(async () => {
   // Load saved chat panel width from session storage
   const savedWidth = sessionStorage.getItem('chatPanelWidth');
   if (savedWidth) {
-    chatPanelWidth.value = parseInt(savedWidth, 10);
+    const parsed = parseInt(savedWidth, 10);
+    if (!isNaN(parsed) && parsed >= 300 && parsed <= 800) {
+      chatPanelWidth.value = parsed;
+    }
   }
 
   // Show welcome modal for new users (anonymous with no rivers)
@@ -508,6 +534,14 @@ onMounted(async () => {
 
   // Set dark theme on body
   document.body.className = 'dark-theme';
+});
+
+// Cleanup keyboard listener on unmount
+onUnmounted(() => {
+  if (keyboardHandler) {
+    window.removeEventListener('keydown', keyboardHandler);
+    keyboardHandler = null;
+  }
 });
 
 // Authentication handlers
@@ -711,22 +745,39 @@ async function handleRegenerate(parentNodeId: string) {
 }
 
 function handleEditResubmit(nodeId: string) {
+  if (!currentRiver.value) return;
+  const node = currentRiver.value.nodes[nodeId];
+  if (!node) return;
+
   editConfirmation.value = {
     isOpen: true,
     nodeId,
+    content: node.content,
   };
+
+  // Auto-focus the textarea
+  nextTick(() => {
+    if (editTextarea.value) {
+      editTextarea.value.focus();
+      // Place cursor at end
+      editTextarea.value.selectionStart = editTextarea.value.value.length;
+      editTextarea.value.selectionEnd = editTextarea.value.value.length;
+    }
+  });
 }
 
 function confirmEditResubmit() {
   const nodeId = editConfirmation.value.nodeId;
-  if (!currentRiver.value || !nodeId) return;
+  const newContent = editConfirmation.value.content.trim();
+  if (!currentRiver.value || !nodeId || !newContent) return;
 
   const node = currentRiver.value.nodes[nodeId];
   if (!node) return;
 
-  // Get new content from user
-  const newContent = prompt('Edit your message:', node.content);
-  if (newContent && newContent.trim() && newContent !== node.content) {
+  // Close the edit modal
+  editConfirmation.value.isOpen = false;
+
+  if (newContent !== node.content) {
     // Delete all children first
     const children = Object.values(currentRiver.value.nodes).filter(
       (n) => n.parentId === nodeId
@@ -734,7 +785,7 @@ function confirmEditResubmit() {
     children.forEach((child) => deleteNode(child.id));
 
     // Update node content
-    updateNodeContent(nodeId, newContent.trim());
+    updateNodeContent(nodeId, newContent);
 
     // Generate new response
     const editModelId = settings.value.lastUsedModelId || DEFAULT_MODEL_ID;
@@ -746,6 +797,8 @@ function confirmEditResubmit() {
     } else {
       showToast('No models available', 'error');
     }
+  } else {
+    showToast('No changes made', 'info');
   }
 }
 
@@ -808,8 +861,11 @@ function confirmDeleteBranchesBatch() {
 }
 
 function handleCopyMessage(content: string) {
-  navigator.clipboard.writeText(content);
-  showToast('Message copied to clipboard', 'success');
+  navigator.clipboard.writeText(content).then(() => {
+    showToast('Message copied to clipboard', 'success');
+  }).catch(() => {
+    showToast('Failed to copy to clipboard', 'error');
+  });
 }
 
 function handleUpdatePosition(nodeId: string, position: { x: number; y: number }) {
@@ -857,8 +913,6 @@ async function handleBranchFromText(nodeId: string, highlightedText: string, use
 }
 
 async function handleChatModelChanged(modelIds: string[]) {
-  // Save chat model selection to persist across prompts and sessions
-  settings.value.selectedModelIds = modelIds;
   // Persist to database immediately (bypass debounce for real-time persistence)
   await updateSettings({ selectedModelIds: modelIds }, true);
 }
@@ -873,19 +927,71 @@ function handlePopOutChat() {
 }
 
 // Toast
+let toastTimeout: ReturnType<typeof setTimeout> | null = null;
+
 function showToast(message: string, type: 'info' | 'success' | 'error' = 'info') {
+  // Clear any existing toast timer to prevent it from hiding the new toast early
+  if (toastTimeout) {
+    clearTimeout(toastTimeout);
+    toastTimeout = null;
+  }
   toast.value = { visible: true, message, type };
-  setTimeout(() => {
+  toastTimeout = setTimeout(() => {
     toast.value.visible = false;
+    toastTimeout = null;
   }, 3000);
 }
 
+// Check if any modal or overlay is currently open
+function isAnyModalOpen(): boolean {
+  return showSettings.value || showRiverDashboard.value || showMessageViewer.value ||
+         showHelp.value || showChatModal.value || showAuth.value || showWelcome.value ||
+         deleteConfirmation.value.isOpen || editConfirmation.value.isOpen || deleteBatchConfirmation.value.isOpen;
+}
+
 // Keyboard Shortcuts
+let keyboardHandler: ((e: KeyboardEvent) => void) | null = null;
+
 function setupKeyboardShortcuts() {
-  window.addEventListener('keydown', (e) => {
-    // Check if user is typing in an input/textarea
-    const isTyping = (e.target as HTMLElement)?.tagName === 'INPUT' || 
-                     (e.target as HTMLElement)?.tagName === 'TEXTAREA';
+  keyboardHandler = (e: KeyboardEvent) => {
+    // Check if user is typing in an input/textarea/contenteditable
+    const target = e.target as HTMLElement;
+    const isTyping = target?.tagName === 'INPUT' ||
+                     target?.tagName === 'TEXTAREA' ||
+                     target?.isContentEditable;
+
+    // Escape: Close modals one at a time (always available)
+    if (e.key === 'Escape') {
+      // Close in priority order: confirmation dialogs > chat modal > other modals > settings > chat panel
+      if (deleteConfirmation.value.isOpen) {
+        deleteConfirmation.value.isOpen = false;
+      } else if (editConfirmation.value.isOpen) {
+        editConfirmation.value.isOpen = false;
+      } else if (deleteBatchConfirmation.value.isOpen) {
+        deleteBatchConfirmation.value.isOpen = false;
+      } else if (showChatModal.value) {
+        showChatModal.value = false;
+      } else if (showMessageViewer.value) {
+        showMessageViewer.value = false;
+      } else if (showHelp.value) {
+        showHelp.value = false;
+      } else if (showRiverDashboard.value) {
+        showRiverDashboard.value = false;
+      } else if (showAuth.value) {
+        showAuth.value = false;
+      } else if (showWelcome.value) {
+        showWelcome.value = false;
+      } else if (showSettings.value) {
+        showSettings.value = false;
+      } else if (selectedNodeId.value || isNewRootMode.value) {
+        selectNode(null);
+        isNewRootMode.value = false;
+      }
+      return;
+    }
+
+    // Block all other shortcuts when a modal is open
+    if (isAnyModalOpen()) return;
 
     // Ctrl/Cmd + ?: Show keyboard shortcuts help
     if ((e.ctrlKey || e.metaKey) && e.key === '?') {
@@ -903,12 +1009,6 @@ function setupKeyboardShortcuts() {
     if ((e.ctrlKey || e.metaKey) && e.key === ',') {
       e.preventDefault();
       showSettings.value = true;
-    }
-
-    // Ctrl/Cmd + F: Search
-    if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-      e.preventDefault();
-      handleSearch();
     }
 
     // Ctrl/Cmd + N: Create new river
@@ -989,21 +1089,6 @@ function setupKeyboardShortcuts() {
       }
     }
 
-    // Escape: Close modals or deselect
-    if (e.key === 'Escape') {
-      if (showChatModal.value) {
-        showChatModal.value = false;
-      } else if (showHelp.value || showSettings.value || showRiverDashboard.value || showMessageViewer.value) {
-        showHelp.value = false;
-        showSettings.value = false;
-        showRiverDashboard.value = false;
-        showMessageViewer.value = false;
-      } else if (selectedNodeId.value || isNewRootMode.value) {
-        selectNode(null);
-        isNewRootMode.value = false;
-      }
-    }
-
     // Actions that require a selected node
     if (selectedNodeId.value && currentRiver.value) {
       const currentNode = currentRiver.value.nodes[selectedNodeId.value];
@@ -1058,7 +1143,9 @@ function setupKeyboardShortcuts() {
         handleDeleteBranch(selectedNodeId.value);
       }
     }
-  });
+  };
+
+  window.addEventListener('keydown', keyboardHandler);
 }
 
 // Graph control functions
@@ -1125,7 +1212,6 @@ function handleSelectAllNodes() {
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 9999;
   background: rgba(0, 0, 0, 0.7);
   backdrop-filter: blur(4px);
   display: flex;
@@ -1162,7 +1248,6 @@ function handleSelectAllNodes() {
   width: 6px;
   cursor: col-resize;
   background: transparent;
-  z-index: 10;
   transition: background-color 0.15s ease;
   will-change: background-color;
   touch-action: none;
@@ -1185,28 +1270,7 @@ body.resizing * {
   cursor: col-resize !important;
 }
 
-@media (max-width: 1024px) {
-  .w-\[400px\] {
-    width: 350px;
-  }
-}
-
 @media (max-width: 768px) {
-  .flex.h-\[calc\(100vh-60px\)\] {
-    flex-direction: column;
-  }
-
-  .w-\[400px\] {
-    width: 100%;
-    height: 40vh;
-    border-left: none;
-    border-top: 1px solid var(--color-border);
-  }
-
-  .flex-1.relative.overflow-hidden {
-    height: 60vh;
-  }
-  
   .resize-handle {
     display: none;
   }

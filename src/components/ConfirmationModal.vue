@@ -1,5 +1,5 @@
 <template>
-  <div v-if="isOpen" class="modal-backdrop" @click.self="emit('close')">
+  <div v-if="isOpen" class="modal-backdrop z-[200]" @click.self="emit('close')">
     <div class="modal-content w-[450px] p-7">
       <h3 class="text-lg font-semibold mb-3" style="color: var(--color-text-primary); letter-spacing: -0.01em;">
         {{ title }}

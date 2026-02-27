@@ -43,7 +43,10 @@ const selectedNodeId = ref<string | null>(null);
 const allRivers = ref<River[]>([]);
 const isLoading = ref(false);
 const isInitializing = ref(true); // Flag to prevent auto-save during initial load
-const isSavingImmediately = ref(false); // Flag to skip debounced watcher during immediate saves
+
+// Track active LLM stream AbortControllers so they can be cancelled
+// when the user switches rivers or logs out.
+const activeStreamControllers = new Set<AbortController>();
 
 export function useRiverChat() {
   const subscription = useSubscription();
@@ -75,10 +78,6 @@ export function useRiverChat() {
   watch(settings, async (newSettings) => {
     if (isInitializing.value) {
       console.log('[useRiverChat] Skipping auto-save during initialization');
-      return;
-    }
-    if (isSavingImmediately.value) {
-      console.log('[useRiverChat] Skipping debounced save - immediate save in progress');
       return;
     }
     // Use debounced save to reduce writes
@@ -116,7 +115,18 @@ export function useRiverChat() {
     return river;
   }
 
+  /** Abort all in-flight LLM streams (e.g. when switching rivers). */
+  function abortActiveStreams(): void {
+    for (const ctrl of activeStreamControllers) {
+      ctrl.abort();
+    }
+    activeStreamControllers.clear();
+  }
+
   async function loadRiver(riverId: string): Promise<boolean> {
+    // Cancel any streams still running for the old river
+    abortActiveStreams();
+
     const river = await FirestoreStorageService.getRiver(riverId);
     if (river) {
       currentRiver.value = river;
@@ -337,12 +347,21 @@ export function useRiverChat() {
     // Update last used model
     settings.value.lastUsedModelId = model.id;
 
+    // Capture the river ID at call time so streaming callbacks
+    // only mutate the river that initiated the request.
+    const riverId = currentRiver.value.id;
+
+    // Create an AbortController for this stream so it can be cancelled
+    // if the user switches rivers or logs out.
+    const controller = new AbortController();
+    activeStreamControllers.add(controller);
+
     const analytics = usePostHog();
     const startTime = Date.now();
 
     // Track message sent
     analytics.capture('message_sent', {
-      river_id: currentRiver.value.id,
+      river_id: riverId,
       model: model,
       web_search_enabled: webSearchEnabled,
       message_length: userNode.content.length,
@@ -355,8 +374,8 @@ export function useRiverChat() {
       currentRiver.value.nodes,
       webSearchEnabled,
       (token: string) => {
-        // On token received
-        if (currentRiver.value) {
+        // On token received — verify we're still on the same river
+        if (currentRiver.value?.id === riverId) {
           const node = currentRiver.value.nodes[aiNode.id];
           if (node) {
             node.content += token;
@@ -365,7 +384,8 @@ export function useRiverChat() {
       },
       (usage) => {
         // On complete
-        if (currentRiver.value) {
+        activeStreamControllers.delete(controller);
+        if (currentRiver.value?.id === riverId) {
           const node = currentRiver.value.nodes[aiNode.id];
           if (node) {
             node.state = 'complete';
@@ -378,7 +398,7 @@ export function useRiverChat() {
             // Track response completed
             const duration = Date.now() - startTime;
             analytics.capture('ai_response_completed', {
-              river_id: currentRiver.value.id,
+              river_id: riverId,
               model: model,
               duration_ms: duration,
               response_length: node.content.length,
@@ -390,7 +410,8 @@ export function useRiverChat() {
       },
       (error: string) => {
         // On error
-        if (currentRiver.value) {
+        activeStreamControllers.delete(controller);
+        if (currentRiver.value?.id === riverId) {
           const node = currentRiver.value.nodes[aiNode.id];
           if (node) {
             node.state = 'error';
@@ -403,13 +424,14 @@ export function useRiverChat() {
             // Track error
             captureException(new Error(error), {
               context: 'ai_response_generation',
-              river_id: currentRiver.value.id,
+              river_id: riverId,
               model: model,
               web_search_enabled: webSearchEnabled,
             });
           }
         }
-      }
+      },
+      controller.signal
     );
   }
 
@@ -551,25 +573,18 @@ export function useRiverChat() {
 
   // Settings Management
   async function updateSettings(newSettings: Partial<Settings>, immediate: boolean = false): Promise<void> {
-    // Set flag to skip debounced watcher if this is an immediate save
-    // Must be set BEFORE updating settings.value to ensure watcher sees it
-    if (immediate) {
-      isSavingImmediately.value = true;
-    }
-
     // Merge new settings into current settings
     const mergedSettings = { ...settings.value, ...newSettings };
     settings.value = mergedSettings;
 
-    // Save immediately (bypasses debounced watcher)
-    await FirestoreStorageService.saveSettings(mergedSettings);
-
-    // Reset flag after save completes
     if (immediate) {
-      // Small delay to ensure watcher has processed the skip
-      await new Promise(resolve => setTimeout(resolve, 10));
-      isSavingImmediately.value = false;
+      // Cancel any pending debounced save so it doesn't overwrite
+      // this immediate save with stale data later.
+      debouncedSaveSettings.cancel();
     }
+
+    // Save to storage
+    await FirestoreStorageService.saveSettings(mergedSettings);
   }
 
   // Selection
@@ -579,70 +594,89 @@ export function useRiverChat() {
 
   // Clear all state (for logout)
   function clearState(): void {
+    abortActiveStreams();
     currentRiver.value = null;
     selectedNodeId.value = null;
   }
 
-  // Initialize - load data and subscription state
+  // Initialize - load data and subscription state.
+  // Serialized: concurrent calls wait for the current run to finish,
+  // then a single force-refresh runs if any caller requested one.
   let pendingForceRefresh = false;
+  let initPromise: Promise<void> | null = null;
+
   async function initialize(forceRefresh: boolean = false): Promise<void> {
-    // If already loading, queue a force refresh to run after the current one completes
     if (isLoading.value) {
       if (forceRefresh) {
-        console.log('[useRiverChat] Initialize already in progress, queuing force refresh');
         pendingForceRefresh = true;
-      } else {
-        console.log('[useRiverChat] Initialize already in progress, skipping');
       }
+      // Wait for the current run (and any queued force-refresh) to finish
+      // so the caller sees fully-loaded state when its await resolves.
+      if (initPromise) await initPromise;
       return;
     }
+
     isLoading.value = true;
     isInitializing.value = true; // Prevent auto-save during load
     debouncedSaveSettings.cancel(); // Cancel any pending debounced save to prevent stale writes
-    try {
-      // Load settings from cache first for instant UI, then sync in background
-      console.log('[useRiverChat] Loading settings from storage...');
-      settings.value = await FirestoreStorageService.getSettings(!forceRefresh);
-      console.log('[useRiverChat] Settings loaded successfully');
 
-      // Load subscription balance and models from server
-      await Promise.all([
-        subscription.refreshBalance(),
-        subscription.refreshModels(),
-      ]);
+    initPromise = (async () => {
+      try {
+        // Load settings from cache first for instant UI, then sync in background
+        console.log('[useRiverChat] Loading settings from storage...');
+        settings.value = await FirestoreStorageService.getSettings(!forceRefresh);
+        console.log('[useRiverChat] Settings loaded successfully');
 
-      // Set default selected model if none
-      if (subscription.availableModels.value.length > 0) {
-        if (!settings.value.selectedModelIds || settings.value.selectedModelIds.length === 0) {
-          const defaultModel = subscription.availableModels.value.find(m => m.id === DEFAULT_MODEL_ID);
-          settings.value.selectedModelIds = [defaultModel?.id ?? subscription.availableModels.value[0]!.id];
-          await FirestoreStorageService.saveSettings(settings.value);
+        // Load subscription balance and models from server
+        await Promise.all([
+          subscription.refreshBalance(),
+          subscription.refreshModels(),
+        ]);
+
+        // Validate and set default selected models
+        if (subscription.availableModels.value.length > 0) {
+          const availableIds = new Set(subscription.availableModels.value.map(m => m.id));
+          const currentIds = settings.value.selectedModelIds || [];
+          const validIds = currentIds.filter(id => availableIds.has(id));
+
+          if (validIds.length === 0) {
+            // No valid models selected — set default
+            const defaultModel = subscription.availableModels.value.find(m => m.id === DEFAULT_MODEL_ID);
+            settings.value.selectedModelIds = [defaultModel?.id ?? subscription.availableModels.value[0]!.id];
+            await FirestoreStorageService.saveSettings(settings.value);
+          } else if (validIds.length !== currentIds.length) {
+            // Some models were stale — keep only valid ones
+            settings.value.selectedModelIds = validIds;
+            await FirestoreStorageService.saveSettings(settings.value);
+          }
+          settings.value.lastModelRefresh = Date.now();
         }
-        settings.value.lastModelRefresh = Date.now();
-      }
 
-      // Load rivers
-      await refreshRivers();
+        // Load rivers
+        await refreshRivers();
 
-      // Load the most recent river if available
-      if (allRivers.value && allRivers.value.length > 0 && allRivers.value[0]) {
-        await loadRiver(allRivers.value[0].id);
-      }
-    } catch (error) {
-      console.error('Failed to initialize:', error);
-    } finally {
-      isLoading.value = false;
-      // Enable auto-save after initialization complete
-      isInitializing.value = false;
-      console.log('[useRiverChat] Initialization complete, auto-save enabled');
+        // Load the most recent river if available
+        if (allRivers.value && allRivers.value.length > 0 && allRivers.value[0]) {
+          await loadRiver(allRivers.value[0].id);
+        }
+      } catch (error) {
+        console.error('Failed to initialize:', error);
+      } finally {
+        isLoading.value = false;
+        // Enable auto-save after initialization complete
+        isInitializing.value = false;
+        console.log('[useRiverChat] Initialization complete, auto-save enabled');
 
-      // If a force refresh was queued while we were loading, run it now
-      if (pendingForceRefresh) {
-        console.log('[useRiverChat] Running queued force refresh');
-        pendingForceRefresh = false;
-        await initialize(true);
+        // If a force refresh was queued while we were loading, run it now
+        if (pendingForceRefresh) {
+          console.log('[useRiverChat] Running queued force refresh');
+          pendingForceRefresh = false;
+          await initialize(true);
+        }
       }
-    }
+    })();
+
+    await initPromise;
   }
 
   return {

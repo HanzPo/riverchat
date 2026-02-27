@@ -49,7 +49,8 @@ export class LLMAPIService {
     webSearchEnabled: boolean,
     onToken: (token: string) => void,
     onComplete: (usage?: UsageMetadata) => void,
-    onError: (error: string) => void
+    onError: (error: string) => void,
+    signal?: AbortSignal
   ): Promise<void> {
     const context = this.buildContext(parentNode, allNodes);
 
@@ -60,9 +61,12 @@ export class LLMAPIService {
         webSearchEnabled,
         onToken,
         onComplete,
-        onError
+        onError,
+        signal
       );
     } catch (error) {
+      // Silently ignore aborted requests — the caller cancelled intentionally
+      if (error instanceof DOMException && error.name === 'AbortError') return;
       onError(error instanceof Error ? error.message : 'Unknown error');
     }
   }
@@ -73,7 +77,8 @@ export class LLMAPIService {
     webSearchEnabled: boolean,
     onToken: (token: string) => void,
     onComplete: (usage?: UsageMetadata) => void,
-    onError: (error: string) => void
+    onError: (error: string) => void,
+    signal?: AbortSignal
   ): Promise<void> {
     try {
       // Get Firebase Auth ID token
@@ -102,11 +107,25 @@ export class LLMAPIService {
           messages,
           webSearch: webSearchEnabled,
         }),
+        signal,
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        const errorMessage = error.error || `API error: ${response.status}`;
+        let errorMessage = `API error: ${response.status}`;
+        try {
+          const text = await response.text();
+          try {
+            const error = JSON.parse(text);
+            errorMessage = error.error || errorMessage;
+          } catch {
+            // Response body is not JSON (e.g. HTML error page)
+            if (text && text.length < 200) {
+              errorMessage = text;
+            }
+          }
+        } catch {
+          // Ignore - use default error message
+        }
 
         captureException(new Error(errorMessage), {
           context: 'proxy_api',
@@ -178,6 +197,9 @@ export class LLMAPIService {
 
       onComplete(usageData);
     } catch (error) {
+      // Silently ignore aborted requests — the caller cancelled intentionally
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+
       const errorMessage = error instanceof Error ? error.message : 'Streaming error';
 
       captureException(error instanceof Error ? error : new Error(errorMessage), {
