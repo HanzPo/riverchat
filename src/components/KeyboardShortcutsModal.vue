@@ -1,6 +1,6 @@
 <template>
-  <div v-if="isOpen" class="modal-overlay z-[200]" @click.self="$emit('close')">
-    <div class="modal-container">
+  <div v-if="isOpen" class="modal-backdrop z-[200]" @click.self="$emit('close')">
+    <div class="modal-content shortcuts-modal-content">
       <div class="modal-header">
         <h2 class="modal-title">⌨️ Keyboard Shortcuts</h2>
         <button @click="$emit('close')" class="modal-close-btn">✕</button>
@@ -58,7 +58,7 @@
               </div>
               <div class="shortcut-item">
                 <div class="shortcut-keys">
-                  <kbd>{{ ctrlKey }}</kbd>
+                  <kbd>Alt</kbd>
                   <span>+</span>
                   <kbd>R</kbd>
                 </div>
@@ -130,6 +130,8 @@
               <div class="shortcut-item">
                 <div class="shortcut-keys">
                   <kbd>{{ ctrlKey }}</kbd>
+                  <span>+</span>
+                  <kbd>Shift</kbd>
                   <span>+</span>
                   <kbd>V</kbd>
                 </div>
@@ -206,52 +208,13 @@ const ctrlKey = computed(() => {
 </script>
 
 <style scoped>
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.8);
-  backdrop-filter: blur(8px);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  animation: fadeIn 0.15s var(--ease-in-out);
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-.modal-container {
-  background: var(--color-background-elevated);
-  backdrop-filter: blur(10px);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
+/* Uses global .modal-backdrop and .modal-content classes from style.css */
+.shortcuts-modal-content {
   max-width: 1100px;
   width: 90%;
   max-height: 85vh;
   display: flex;
   flex-direction: column;
-  box-shadow: var(--shadow-2xl);
-  animation: slideUp 0.2s var(--ease-out-expo);
-}
-
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 .modal-header {
@@ -423,7 +386,7 @@ kbd {
 }
 
 @media (max-width: 768px) {
-  .modal-container {
+  .shortcuts-modal-content {
     width: 95%;
     max-height: 90vh;
   }

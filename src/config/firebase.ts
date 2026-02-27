@@ -2,6 +2,7 @@ import { initializeApp, type FirebaseApp } from 'firebase/app';
 import { getAuth, type Auth } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore';
 import { getFunctions, httpsCallable, type Functions } from 'firebase/functions';
+import { getAnalytics, isSupported, type Analytics } from 'firebase/analytics';
 
 // Firebase configuration from environment variables
 const firebaseConfig = {
@@ -18,6 +19,7 @@ let app: FirebaseApp;
 let auth: Auth;
 let db: Firestore;
 let functions: Functions;
+let analytics: Analytics | null = null;
 
 try {
   app = initializeApp(firebaseConfig);
@@ -25,11 +27,18 @@ try {
   db = getFirestore(app);
   functions = getFunctions(app, 'us-central1');
 
+  // Initialize Analytics only if supported (not in SSR, extensions, etc.)
+  isSupported().then((supported) => {
+    if (supported) {
+      analytics = getAnalytics(app);
+    }
+  }).catch(() => {});
+
   console.log('Firebase initialized successfully');
 } catch (error) {
   console.error('Error initializing Firebase:', error);
   throw error;
 }
 
-export { app, auth, db, functions, httpsCallable };
+export { app, auth, db, functions, analytics, httpsCallable };
 export default app;

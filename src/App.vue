@@ -1,5 +1,5 @@
 <template>
-  <div class="w-screen h-screen overflow-hidden relative" style="background: var(--color-background);">
+  <div class="w-screen h-screen overflow-hidden relative" style="background: var(--color-background);" :data-initialized="hasInitialized || undefined">
     <!-- Floating App Title and Navigation (Top Left) -->
     <div v-if="!showSettings" class="fixed top-4 left-4 z-50 flex flex-col gap-2">
       <!-- Logo and River Name -->
@@ -18,7 +18,7 @@
           <Folder :size="14" />
           <span>Rivers</span>
         </button>
-        <button @click="handleSearch" class="btn-material p-2" title="Search">
+        <button class="btn-material p-2 opacity-50 cursor-not-allowed" title="Search (coming soon)" disabled>
           <Search :size="14" />
         </button>
         <button @click="showHelp = true" class="btn-material p-2" title="Keyboard Shortcuts (Ctrl+?)">
@@ -53,6 +53,7 @@
           :nodes="currentRiver.nodes"
           :root-node-id="currentRiver.rootNodeId"
           :selected-node-id="selectedNodeId"
+          :show-minimap="showMinimap"
           @node-select="selectNode"
           @node-double-click="handleNodeDoubleClick"
           @branch-from="handleBranchFrom"
@@ -96,7 +97,7 @@
       <!-- Right Panel: Chat History -->
       <div 
         ref="chatPanel"
-        v-if="(selectedNodeId || isNewRootMode) && !hasMultipleNodesSelected" 
+        v-if="(selectedNodeId || isNewRootMode) && !hasMultipleNodesSelected && !showChatModal"
         class="flex flex-col relative"
         :style="{ 
           width: `${chatPanelWidth}px`, 
@@ -225,6 +226,7 @@
     />
 
     <ChatModal
+      v-if="showChatModal"
       :is-open="showChatModal"
       :path="currentPath"
       :selected-node-id="selectedNodeId"
@@ -279,7 +281,7 @@ import ChatHistory from './components/ChatHistory.vue';
 
 // Non-critical components lazy loaded
 const ChatModal = defineAsyncComponent(() => import('./components/ChatModal.vue'));
-const WelcomeModal = defineAsyncComponent(() => import('./components/WelcomeModal.vue'));
+import WelcomeModal from './components/WelcomeModal.vue';
 const SettingsPage = defineAsyncComponent(() => import('./components/SettingsPage.vue'));
 const RiverDashboard = defineAsyncComponent(() => import('./components/RiverDashboard.vue'));
 const MessageViewerModal = defineAsyncComponent(() => import('./components/MessageViewerModal.vue'));
@@ -324,6 +326,8 @@ const showAuth = ref(false);
 const viewingMessage = ref<MessageNode | null>(null);
 const isNewRootMode = ref(false);
 const hasMultipleNodesSelected = ref(false);
+const hasInitialized = ref(false);
+const showMinimap = ref(true);
 
 // Authentication state
 const currentUser = ref<User | null>(null);
@@ -463,6 +467,7 @@ onMounted(async () => {
 
   // Initialize the app with cached data (auth is now guaranteed to be ready)
   await initialize();
+  hasInitialized.value = true;
 
   // Listen to authentication state changes
   let isFirstAuthCheck = true;
@@ -508,7 +513,8 @@ onMounted(async () => {
   }
 
   // Show welcome modal for new users (anonymous with no rivers)
-  if ((!currentUser.value || currentUser.value.isAnonymous) && allRivers.value.length === 0) {
+  // Only show after initialization is complete to avoid race conditions
+  if (hasInitialized.value && (!currentUser.value || currentUser.value.isAnonymous) && allRivers.value.length === 0) {
     showWelcome.value = true;
   }
 
@@ -896,19 +902,15 @@ function handleSelectionChange(hasMultiple: boolean) {
   hasMultipleNodesSelected.value = hasMultiple;
 }
 
-function handleSearch() {
-  showToast('Search functionality coming soon!', 'info');
-}
-
 async function handleBranchFromText(nodeId: string, highlightedText: string, userPrompt: string, models: LLMModel[], webSearchEnabled: boolean) {
   if (!currentRiver.value) return;
 
   isSendingMessage.value = true;
   try {
+    showToast(`Creating ${models.length} branch${models.length > 1 ? 'es' : ''} with selected context...`, 'info');
     // Create branches for all selected models in parallel
     const promises = models.map(model => branchFromText(nodeId, highlightedText, userPrompt, model, webSearchEnabled));
     await Promise.all(promises);
-    showToast(`Creating ${models.length} branch${models.length > 1 ? 'es' : ''} with selected context...`, 'info');
   } catch (error) {
     showToast(error instanceof Error ? error.message : 'Failed to create branch', 'error');
   } finally {
@@ -1021,8 +1023,8 @@ function setupKeyboardShortcuts() {
       showRiverDashboard.value = true;
     }
 
-    // Ctrl/Cmd + R: Create new root node
-    if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
+    // Alt/Option + R: Create new root node
+    if (e.altKey && (e.key === 'r' || e.key === 'R')) {
       e.preventDefault();
       if (currentRiver.value) {
         handleCreateRootNode();
@@ -1087,10 +1089,8 @@ function setupKeyboardShortcuts() {
     // Ctrl/Cmd + Enter: Send message (when chat input is focused)
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && isTyping) {
       e.preventDefault();
-      const chatForm = document.querySelector('form') as HTMLFormElement;
-      if (chatForm) {
-        chatForm.requestSubmit();
-      }
+      // Dispatch custom event that ChatHistory/ChatModal listen for
+      window.dispatchEvent(new CustomEvent('riverchat:send-message'));
     }
 
     // Actions that require a selected node
@@ -1124,16 +1124,18 @@ function setupKeyboardShortcuts() {
         }
       }
 
-      // Ctrl/Cmd + C: Copy message (only if not typing)
+      // Ctrl/Cmd + C: Copy message (only if not typing and no text selected)
       if ((e.ctrlKey || e.metaKey) && e.key === 'c' && !isTyping) {
-        e.preventDefault();
-        if (currentNode) {
+        const selectedText = window.getSelection()?.toString();
+        if (!selectedText && currentNode) {
+          e.preventDefault();
           handleCopyMessage(currentNode.content);
         }
+        // Otherwise, allow native copy behavior
       }
 
-      // Ctrl/Cmd + V: View full message (only if not typing)
-      if ((e.ctrlKey || e.metaKey) && e.key === 'v' && !isTyping) {
+      // Ctrl/Cmd + Shift + V: View full message (avoid hijacking native paste)
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'V' || e.key === 'v') && !isTyping) {
         e.preventDefault();
         if (currentNode) {
           viewingMessage.value = currentNode;
@@ -1152,58 +1154,27 @@ function setupKeyboardShortcuts() {
   window.addEventListener('keydown', keyboardHandler);
 }
 
-// Graph control functions
+// Graph control functions (using exposed Vue Flow API methods)
 function handleZoomIn() {
-  if (graphCanvas.value?.$el) {
-    const zoomInButton = graphCanvas.value.$el.querySelector('.vue-flow__controls-zoom-in');
-    if (zoomInButton) {
-      zoomInButton.click();
-    }
-  }
+  graphCanvas.value?.zoomIn();
 }
 
 function handleZoomOut() {
-  if (graphCanvas.value?.$el) {
-    const zoomOutButton = graphCanvas.value.$el.querySelector('.vue-flow__controls-zoom-out');
-    if (zoomOutButton) {
-      zoomOutButton.click();
-    }
-  }
+  graphCanvas.value?.zoomOut();
 }
 
 function handleZoomReset() {
-  if (graphCanvas.value?.$el) {
-    const fitViewButton = graphCanvas.value.$el.querySelector('.vue-flow__controls-fitview');
-    if (fitViewButton) {
-      fitViewButton.click();
-    }
-  }
+  graphCanvas.value?.fitView();
 }
 
 function handleToggleMinimap() {
-  if (graphCanvas.value?.$el) {
-    const minimap = graphCanvas.value.$el.querySelector('.vue-flow__minimap');
-    if (minimap) {
-      minimap.style.display = minimap.style.display === 'none' ? 'block' : 'none';
-    }
-  }
+  showMinimap.value = !showMinimap.value;
 }
 
 function handleSelectAllNodes() {
-  if (currentRiver.value && graphCanvas.value?.$el) {
-    const nodeElements = graphCanvas.value.$el.querySelectorAll('.vue-flow__node');
-    nodeElements.forEach((node: HTMLElement) => {
-      node.classList.add('selected');
-      // Trigger a click with ctrl key held
-      const event = new MouseEvent('click', {
-        bubbles: true,
-        cancelable: true,
-        ctrlKey: true,
-        metaKey: true,
-      });
-      node.dispatchEvent(event);
-    });
-    showToast(`Selected ${nodeElements.length} nodes`, 'info');
+  if (currentRiver.value && graphCanvas.value) {
+    const count = graphCanvas.value.selectAllNodes();
+    showToast(`Selected ${count} nodes`, 'info');
   }
 }
 </script>
