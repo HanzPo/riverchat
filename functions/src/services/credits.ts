@@ -1,5 +1,6 @@
 import * as admin from 'firebase-admin';
 import type { SubscriptionTier } from '../config/tiers.js';
+import { TIER_CONFIGS } from '../config/tiers.js';
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -22,14 +23,73 @@ export interface DeductionResult {
 }
 
 /**
+ * Check if a user document needs free-tier credit initialization.
+ * A user is uninitialized if they have no currentPeriodEnd set
+ * (meaning neither the reset job nor Stripe has ever provisioned them).
+ */
+function isUninitializedFreeUser(
+  data: FirebaseFirestore.DocumentData
+): boolean {
+  return (
+    !data.currentPeriodEnd &&
+    (data.subscriptionTier ?? 'free') === 'free'
+  );
+}
+
+/**
+ * Check if a free-tier user's billing period has expired and credits
+ * need to be reset. This catches the gap between period expiry and
+ * the daily scheduled reset job.
+ */
+function isExpiredFreeUser(
+  data: FirebaseFirestore.DocumentData
+): boolean {
+  if ((data.subscriptionTier ?? 'free') !== 'free') return false;
+  const periodEnd = data.currentPeriodEnd;
+  if (!periodEnd) return false;
+  const periodEndMs =
+    typeof periodEnd.toMillis === 'function'
+      ? periodEnd.toMillis()
+      : periodEnd;
+  return Date.now() > periodEndMs;
+}
+
+/**
  * Get a user's current balance from their profile.
+ * If the user is an uninitialized free-tier user, provisions their
+ * initial credits and period before returning.
  */
 export async function getBalance(uid: string): Promise<UserBalance> {
-  const doc = await db.doc(`users/${uid}`).get();
+  const userRef = db.doc(`users/${uid}`);
+  const doc = await userRef.get();
   if (!doc.exists) {
     throw new Error(`User ${uid} not found`);
   }
   const data = doc.data()!;
+
+  // Provision or reset free-tier credits inline so users never have to
+  // wait for the daily scheduled job.
+  if (isUninitializedFreeUser(data) || isExpiredFreeUser(data)) {
+    const now = admin.firestore.Timestamp.now();
+    const periodEnd = admin.firestore.Timestamp.fromMillis(
+      now.toMillis() + 30 * 24 * 60 * 60 * 1000
+    );
+    const credits = TIER_CONFIGS.free.monthlyCredits;
+    await userRef.update({
+      subscriptionCredits: credits,
+      subscriptionTier: 'free',
+      currentPeriodEnd: periodEnd,
+      creditEpoch: (data.creditEpoch ?? 0) + 1,
+    });
+    return {
+      subscriptionCredits: credits,
+      prepaidCredits: data.prepaidCredits ?? 0,
+      total: credits + (data.prepaidCredits ?? 0),
+      tier: 'free',
+      currentPeriodEnd: periodEnd,
+    };
+  }
+
   const subCredits = data.subscriptionCredits ?? 0;
   const prepaidCredits = data.prepaidCredits ?? 0;
   return {
@@ -161,7 +221,20 @@ export async function reserveCredits(
     const data = doc.data()!;
     let subCredits: number = data.subscriptionCredits ?? 0;
     let prepaidCredits: number = data.prepaidCredits ?? 0;
-    const creditEpoch: number = data.creditEpoch ?? 0;
+    let creditEpoch: number = data.creditEpoch ?? 0;
+    const extraFields: Record<string, unknown> = {};
+
+    // Initialize or reset free-tier users within the transaction
+    if (isUninitializedFreeUser(data) || isExpiredFreeUser(data)) {
+      subCredits = TIER_CONFIGS.free.monthlyCredits;
+      creditEpoch += 1;
+      extraFields.subscriptionTier = 'free';
+      extraFields.currentPeriodEnd = admin.firestore.Timestamp.fromMillis(
+        Date.now() + 30 * 24 * 60 * 60 * 1000
+      );
+      extraFields.creditEpoch = creditEpoch;
+    }
+
     const total = subCredits + prepaidCredits;
 
     if (total < Math.max(estimatedCents, 1)) {
@@ -183,6 +256,7 @@ export async function reserveCredits(
     tx.update(userRef, {
       subscriptionCredits: subCredits,
       prepaidCredits: prepaidCredits,
+      ...extraFields,
     });
 
     return {

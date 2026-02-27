@@ -913,8 +913,6 @@ async function handleBranchFromText(nodeId: string, highlightedText: string, use
 }
 
 async function handleChatModelChanged(modelIds: string[]) {
-  // Save chat model selection to persist across prompts and sessions
-  settings.value.selectedModelIds = modelIds;
   // Persist to database immediately (bypass debounce for real-time persistence)
   await updateSettings({ selectedModelIds: modelIds }, true);
 }

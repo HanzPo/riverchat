@@ -44,9 +44,12 @@
     </div>
 
     <!-- Error Badge -->
-    <div v-if="data.state === 'error'" class="px-2.5 py-1.5 rounded-md text-xs font-semibold mb-2 text-center flex items-center justify-center gap-1.5" style="background: var(--color-error-bg); color: var(--color-error); border: 1px solid var(--color-error);">
-      <AlertTriangle :size="12" />
-      <span>Error</span>
+    <div v-if="data.state === 'error'" class="error-badge-wrapper relative">
+      <div class="px-2.5 py-1.5 rounded-md text-xs font-semibold mb-2 text-center flex items-center justify-center gap-1.5" style="background: var(--color-error-bg); color: var(--color-error); border: 1px solid var(--color-error);">
+        <AlertTriangle :size="12" />
+        <span>Error</span>
+      </div>
+      <div v-if="data.error" class="error-tooltip">{{ data.error }}</div>
     </div>
 
     <!-- Timestamp -->
@@ -152,5 +155,33 @@ function handleContextMenu(event: MouseEvent) {
   box-shadow: 0 0 0 4px var(--color-primary-muted),
               0 4px 12px rgba(13, 153, 255, 0.3) !important;
   outline: none;
+}
+
+/* Error tooltip */
+.error-tooltip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--color-background);
+  color: var(--color-error);
+  border: 1px solid var(--color-error);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-width: 300px;
+  width: max-content;
+  z-index: 50;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.error-badge-wrapper:hover .error-tooltip {
+  display: block;
 }
 </style>
