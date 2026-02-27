@@ -136,7 +136,6 @@ export function useAnalytics() {
         if (userProfile) {
           setUserProperties(analytics, {
             subscription_tier: userProfile.subscriptionTier,
-            has_api_keys: userProfile.encryptedAPIKeys?.openrouter ? 'true' : 'false',
           });
         }
 

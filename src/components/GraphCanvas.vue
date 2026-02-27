@@ -19,7 +19,7 @@
     >
       <Background variant="dots" pattern-color="#404040" :gap="30" />
       <Controls />
-      <MiniMap />
+      <MiniMap v-show="props.showMinimap !== false" />
 
       <template #node-custom="nodeProps">
         <CustomNode
@@ -138,6 +138,7 @@ interface Props {
   nodes: Record<string, MessageNode>;
   rootNodeId: string | null;
   selectedNodeId: string | null;
+  showMinimap?: boolean;
 }
 
 interface Emits {
@@ -159,7 +160,7 @@ interface Emits {
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
-const { getSelectedNodes, project, vueFlowRef } = useVueFlow();
+const { getSelectedNodes, project, vueFlowRef, zoomIn, zoomOut, fitView, addSelectedNodes } = useVueFlow();
 
 // Track nodes being dragged to batch position updates
 const draggedNodes = ref<Set<string>>(new Set());
@@ -799,6 +800,18 @@ onUnmounted(() => {
     clearTimeout(dragBatchTimeout);
     dragBatchTimeout = null;
   }
+});
+
+// Expose methods for parent component to call via ref
+defineExpose({
+  zoomIn: () => zoomIn(),
+  zoomOut: () => zoomOut(),
+  fitView: () => fitView(),
+  selectAllNodes: () => {
+    const allNodes = flowNodes.value.map(n => n as any);
+    addSelectedNodes(allNodes);
+    return allNodes.length;
+  },
 });
 </script>
 
