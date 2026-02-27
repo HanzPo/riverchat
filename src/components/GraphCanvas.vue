@@ -1,5 +1,5 @@
 <template>
-  <div class="graph-canvas" ref="canvasContainer" @mousedown.right="onRightMouseDown" @contextmenu.capture="onCanvasContextMenu">
+  <div class="graph-canvas" ref="canvasContainer" @mousedown.right="onRightMouseDown">
     <VueFlow
       v-model:nodes="flowNodes"
       v-model:edges="flowEdges"
@@ -537,28 +537,19 @@ function onRightMouseDown(event: MouseEvent) {
   rightMouseDownPos = { x: event.clientX, y: event.clientY };
 }
 
-function onCanvasContextMenu(event: MouseEvent) {
-  // If the mouse moved more than 5px from mousedown, it was a drag — suppress
-  if (rightMouseDownPos) {
-    const dx = event.clientX - rightMouseDownPos.x;
-    const dy = event.clientY - rightMouseDownPos.y;
-    if (Math.sqrt(dx * dx + dy * dy) > 5) {
-      event.preventDefault();
-      event.stopPropagation();
+function handlePaneContextMenu(event: any) {
+  const mouseEvent = event.event || event;
+
+  // Check if the mouse moved since right-click down — if so, it was a drag, not a click
+  if (rightMouseDownPos && mouseEvent) {
+    const dx = mouseEvent.clientX - rightMouseDownPos.x;
+    const dy = mouseEvent.clientY - rightMouseDownPos.y;
+    if (dx * dx + dy * dy > 25) {
       rightMouseDownPos = null;
       return;
     }
   }
   rightMouseDownPos = null;
-}
-
-function handlePaneContextMenu(event: any) {
-  // Don't show context menu if we just completed a drag selection
-  if (isRightDragging.value || Date.now() - lastDragEndTime < 200) {
-    return;
-  }
-
-  const mouseEvent = event.event || event;
 
   if (mouseEvent) {
     // Check if multiple nodes are currently selected
