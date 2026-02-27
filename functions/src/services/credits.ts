@@ -56,8 +56,10 @@ function isExpiredFreeUser(
 
 /**
  * Get a user's current balance from their profile.
- * If the user is an uninitialized free-tier user, provisions their
- * initial credits and period before returning.
+ * If the user is an uninitialized or expired free-tier user, returns the
+ * would-be provisioned balance without writing to Firestore. The actual
+ * provisioning happens atomically inside reserveCredits() and the daily
+ * reset job, avoiding race conditions with concurrent credit operations.
  */
 export async function getBalance(uid: string): Promise<UserBalance> {
   const userRef = db.doc(`users/${uid}`);
@@ -67,26 +69,17 @@ export async function getBalance(uid: string): Promise<UserBalance> {
   }
   const data = doc.data()!;
 
-  // Provision or reset free-tier credits inline so users never have to
-  // wait for the daily scheduled job.
+  // Return the would-be provisioned balance so the UI shows correct
+  // credits, without writing — the actual write happens transactionally
+  // in reserveCredits() or the daily scheduled reset job.
   if (isUninitializedFreeUser(data) || isExpiredFreeUser(data)) {
-    const now = admin.firestore.Timestamp.now();
-    const periodEnd = admin.firestore.Timestamp.fromMillis(
-      now.toMillis() + 30 * 24 * 60 * 60 * 1000
-    );
     const credits = TIER_CONFIGS.free.monthlyCredits;
-    await userRef.update({
-      subscriptionCredits: credits,
-      subscriptionTier: 'free',
-      currentPeriodEnd: periodEnd,
-      creditEpoch: (data.creditEpoch ?? 0) + 1,
-    });
     return {
       subscriptionCredits: credits,
       prepaidCredits: data.prepaidCredits ?? 0,
       total: credits + (data.prepaidCredits ?? 0),
       tier: 'free',
-      currentPeriodEnd: periodEnd,
+      currentPeriodEnd: data.currentPeriodEnd ?? null,
     };
   }
 
