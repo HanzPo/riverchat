@@ -186,6 +186,7 @@ function onDocMouseDown(event: MouseEvent) {
     rightClickStart = { x: event.clientX, y: event.clientY };
     rightButtonDown = true;
     suppressNextContextMenu = false;
+    console.log('[DEBUG] right mousedown at', event.clientX, event.clientY);
   }
 }
 
@@ -193,8 +194,10 @@ function onDocMouseMove(event: MouseEvent) {
   if (rightButtonDown && rightClickStart) {
     const dx = event.clientX - rightClickStart.x;
     const dy = event.clientY - rightClickStart.y;
-    if (dx * dx + dy * dy > 25) {
+    const dist = dx * dx + dy * dy;
+    if (dist > 25 && !suppressNextContextMenu) {
       suppressNextContextMenu = true;
+      console.log('[DEBUG] drag detected, suppress=true, dist=', Math.sqrt(dist));
     }
   }
 }
@@ -202,6 +205,7 @@ function onDocMouseMove(event: MouseEvent) {
 function onDocMouseUp(event: MouseEvent) {
   if (event.button === 2) {
     rightButtonDown = false;
+    console.log('[DEBUG] right mouseup, suppress=', suppressNextContextMenu);
   }
 }
 
@@ -509,8 +513,10 @@ function clampMenuPosition(x: number, y: number, menuWidth: number = 220, menuHe
 }
 
 function handleNodeContextMenu(event: any) {
+  console.log('[DEBUG] handleNodeContextMenu called, suppress=', suppressNextContextMenu);
   if (suppressNextContextMenu) {
     suppressNextContextMenu = false;
+    console.log('[DEBUG] -> SUPPRESSED node context menu');
     return;
   }
 
@@ -542,8 +548,10 @@ function handlePaneClick() {
 }
 
 function handlePaneContextMenu(event: any) {
+  console.log('[DEBUG] handlePaneContextMenu called, suppress=', suppressNextContextMenu);
   if (suppressNextContextMenu) {
     suppressNextContextMenu = false;
+    console.log('[DEBUG] -> SUPPRESSED pane context menu');
     return;
   }
 
