@@ -44,4 +44,5 @@ Thumbs.db
 
 # Cloud Functions
 functions/node_modules
-functions/libtest-results/
+functions/lib/
+test-results/
