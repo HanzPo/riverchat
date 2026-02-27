@@ -177,8 +177,7 @@ const selectionBox = ref({
   height: 0,
 });
 const isRightDragging = ref(false);
-let lastDragEndTime = 0;
-let rightMouseDownPos: { x: number; y: number } | null = null;
+let suppressNextContextMenu = false;
 
 // Watch for selection changes and emit to parent
 watch(
@@ -345,7 +344,6 @@ function startSelectionBox(event: MouseEvent) {
   const rect = canvasContainer.value?.getBoundingClientRect();
   if (!rect) return;
 
-  rightMouseDownPos = { x: event.clientX, y: event.clientY };
   isRightDragging.value = false;
   
   selectionBox.value = {
@@ -361,15 +359,6 @@ function startSelectionBox(event: MouseEvent) {
   // Add event listeners
   document.addEventListener('mousemove', updateSelectionBox);
   document.addEventListener('mouseup', endSelectionBox);
-  document.addEventListener('contextmenu', preventContextMenu);
-}
-
-function preventContextMenu(event: Event) {
-  if (isRightDragging.value || Date.now() - lastDragEndTime < 200) {
-    event.preventDefault();
-    event.stopPropagation();
-  }
-  document.removeEventListener('contextmenu', preventContextMenu);
 }
 
 function updateSelectionBox(event: MouseEvent) {
@@ -399,35 +388,22 @@ function updateSelectionBox(event: MouseEvent) {
   
   if (dragDistance > 5) {
     isRightDragging.value = true;
+    suppressNextContextMenu = true;
   }
 }
 
-function endSelectionBox(event: MouseEvent) {
+function endSelectionBox(_event: MouseEvent) {
   if (!selectionBox.value.active) return;
-  
-  const wasDragging = isRightDragging.value;
-  
-  // Only select nodes if we actually dragged
-  if (wasDragging) {
-    // Prevent context menu from showing
-    event.preventDefault();
-    event.stopPropagation();
 
-    // Select nodes within the selection box
+  if (isRightDragging.value) {
     selectNodesInBox();
-
-    lastDragEndTime = Date.now();
   }
 
   isRightDragging.value = false;
-  
-  // Reset selection box
   selectionBox.value.active = false;
-  
-  // Remove event listeners
+
   document.removeEventListener('mousemove', updateSelectionBox);
   document.removeEventListener('mouseup', endSelectionBox);
-  document.removeEventListener('contextmenu', preventContextMenu);
 }
 
 function selectNodesInBox() {
@@ -535,18 +511,12 @@ function handlePaneClick() {
 }
 
 function handlePaneContextMenu(event: any) {
-  const mouseEvent = event.event || event;
-
-  // Check if the mouse moved since right-click down — if so, it was a drag, not a click
-  if (rightMouseDownPos && mouseEvent) {
-    const dx = mouseEvent.clientX - rightMouseDownPos.x;
-    const dy = mouseEvent.clientY - rightMouseDownPos.y;
-    if (dx * dx + dy * dy > 25) {
-      rightMouseDownPos = null;
-      return;
-    }
+  if (suppressNextContextMenu) {
+    suppressNextContextMenu = false;
+    return;
   }
-  rightMouseDownPos = null;
+
+  const mouseEvent = event.event || event;
 
   if (mouseEvent) {
     // Check if multiple nodes are currently selected
@@ -763,7 +733,6 @@ onUnmounted(() => {
   // Clean up any lingering event listeners
   document.removeEventListener('mousemove', updateSelectionBox);
   document.removeEventListener('mouseup', endSelectionBox);
-  document.removeEventListener('contextmenu', preventContextMenu);
 
   // Cancel any pending drag batch timeout
   if (dragBatchTimeout) {
