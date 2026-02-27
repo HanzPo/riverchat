@@ -1,5 +1,5 @@
 <template>
-  <div class="graph-canvas" ref="canvasContainer" @mousedown.right="trackRightMouseDown" @mousemove="trackMouseMove">
+  <div class="graph-canvas" ref="canvasContainer">
     <VueFlow
       v-model:nodes="flowNodes"
       v-model:edges="flowEdges"
@@ -181,20 +181,27 @@ let suppressNextContextMenu = false;
 let rightClickStart: { x: number; y: number } | null = null;
 let rightButtonDown = false;
 
-function trackRightMouseDown(event: MouseEvent) {
-  rightClickStart = { x: event.clientX, y: event.clientY };
-  rightButtonDown = true;
-  const onUp = () => { rightButtonDown = false; document.removeEventListener('mouseup', onUp); };
-  document.addEventListener('mouseup', onUp);
+function onDocMouseDown(event: MouseEvent) {
+  if (event.button === 2) {
+    rightClickStart = { x: event.clientX, y: event.clientY };
+    rightButtonDown = true;
+    suppressNextContextMenu = false;
+  }
 }
 
-function trackMouseMove(event: MouseEvent) {
+function onDocMouseMove(event: MouseEvent) {
   if (rightButtonDown && rightClickStart) {
     const dx = event.clientX - rightClickStart.x;
     const dy = event.clientY - rightClickStart.y;
     if (dx * dx + dy * dy > 25) {
       suppressNextContextMenu = true;
     }
+  }
+}
+
+function onDocMouseUp(event: MouseEvent) {
+  if (event.button === 2) {
+    rightButtonDown = false;
   }
 }
 
@@ -727,16 +734,21 @@ let cleanupSelectionListener: (() => void) | null = null;
 onMounted(() => {
   // Add click listener for closing context menu
   window.addEventListener('click', handleClickOutside);
-  
+
   // Add keyboard listener for node deletion
   window.addEventListener('keydown', handleKeyboardDelete);
-  
+
+  // Track right-click drag globally (capture phase to fire before Vue Flow)
+  document.addEventListener('mousedown', onDocMouseDown, true);
+  document.addEventListener('mousemove', onDocMouseMove, true);
+  document.addEventListener('mouseup', onDocMouseUp, true);
+
   // Find the Vue Flow pane element
   const paneElement = document.querySelector('.vue-flow__pane');
-  
+
   if (paneElement) {
     paneElement.addEventListener('mousedown', startSelectionBox as EventListener);
-    
+
     cleanupSelectionListener = () => {
       paneElement.removeEventListener('mousedown', startSelectionBox as EventListener);
     };
@@ -749,6 +761,11 @@ onUnmounted(() => {
 
   // Remove keyboard listener
   window.removeEventListener('keydown', handleKeyboardDelete);
+
+  // Remove right-click drag tracking
+  document.removeEventListener('mousedown', onDocMouseDown, true);
+  document.removeEventListener('mousemove', onDocMouseMove, true);
+  document.removeEventListener('mouseup', onDocMouseUp, true);
 
   if (cleanupSelectionListener) {
     cleanupSelectionListener();
