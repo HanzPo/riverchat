@@ -60,10 +60,10 @@
                     @keyup.escape="cancelRename"
                     @blur="confirmRename"
                   />
-                  <button @click="confirmRename" class="btn-material" style="padding: 4px 6px;" title="Save">
+                  <button @mousedown.prevent="confirmRename" class="btn-material" style="padding: 4px 6px;" title="Save">
                     <Check :size="14" />
                   </button>
-                  <button @click="cancelRename" class="btn-material" style="padding: 4px 6px;" title="Cancel">
+                  <button @mousedown.prevent="cancelRename" class="btn-material" style="padding: 4px 6px;" title="Cancel">
                     <X :size="14" />
                   </button>
                 </div>
