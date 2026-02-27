@@ -1,5 +1,5 @@
 <template>
-  <div class="graph-canvas" ref="canvasContainer" @mousedown.right="onRightMouseDown">
+  <div class="graph-canvas" ref="canvasContainer">
     <VueFlow
       v-model:nodes="flowNodes"
       v-model:edges="flowEdges"
@@ -341,10 +341,11 @@ function layoutTree(
 function startSelectionBox(event: MouseEvent) {
   // Only start selection on right-click
   if (event.button !== 2) return;
-  
+
   const rect = canvasContainer.value?.getBoundingClientRect();
   if (!rect) return;
-  
+
+  rightMouseDownPos = { x: event.clientX, y: event.clientY };
   isRightDragging.value = false;
   
   selectionBox.value = {
@@ -531,10 +532,6 @@ function handlePaneClick() {
   emit('pane-click');
   emit('selection-change', false);
   closeContextMenu();
-}
-
-function onRightMouseDown(event: MouseEvent) {
-  rightMouseDownPos = { x: event.clientX, y: event.clientY };
 }
 
 function handlePaneContextMenu(event: any) {
