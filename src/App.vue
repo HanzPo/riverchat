@@ -448,17 +448,21 @@ onMounted(async () => {
     } as any;
   }
 
-  // Initialize the app with cached data
-  await initialize();
+  // Wait for Firebase Auth to restore any persisted session before
+  // initializing, so cloud function calls (getBalance, etc.) have a
+  // valid auth token. Without this, returning users who signed in
+  // before the subscription system would see 0 credits because
+  // refreshBalance() fires before the auth session is restored.
+  await auth.authStateReady();
 
   // Auto-sign in anonymously if no user — gives them a real Firebase session
   // so cloud functions (streamChat, getBalance, etc.) work immediately
   if (!auth.currentUser) {
     await AuthService.signInAnonymouslyIfNeeded();
-    // Refresh balance now that we have an authenticated session
-    // (the initial initialize() ran without auth, so balance is stale)
-    await subscription.refreshBalance();
   }
+
+  // Initialize the app with cached data (auth is now guaranteed to be ready)
+  await initialize();
 
   // Listen to authentication state changes
   let isFirstAuthCheck = true;
