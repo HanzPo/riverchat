@@ -1,5 +1,5 @@
 <template>
-  <div class="graph-canvas" ref="canvasContainer" @mousedown.right="onRightMouseDown" @contextmenu="onCanvasContextMenu">
+  <div class="graph-canvas" ref="canvasContainer" @mousedown.right="onRightMouseDown" @contextmenu.capture="onCanvasContextMenu">
     <VueFlow
       v-model:nodes="flowNodes"
       v-model:edges="flowEdges"
