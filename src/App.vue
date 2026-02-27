@@ -226,6 +226,7 @@
     />
 
     <ChatModal
+      v-if="showChatModal"
       :is-open="showChatModal"
       :path="currentPath"
       :selected-node-id="selectedNodeId"
