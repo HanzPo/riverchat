@@ -3,10 +3,12 @@ import {
   onAuthStateChanged,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithCredential,
   signInAnonymously,
   linkWithPopup,
   type User,
   type UserCredential,
+  type OAuthCredential,
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
@@ -31,6 +33,9 @@ export interface UserProfile {
 }
 
 export class AuthService {
+  // Credential captured from a failed linkWithPopup, reused for force sign-in
+  private static pendingCredential: OAuthCredential | null = null;
+
   static async signInWithGoogle(forceSignIn: boolean = false): Promise<UserCredential> {
     try {
       const provider = new GoogleAuthProvider();
@@ -40,14 +45,20 @@ export class AuthService {
       let userCredential: UserCredential;
       let wasAnonymous = false;
 
-      if (currentUser && currentUser.isAnonymous && !forceSignIn) {
+      if (forceSignIn && this.pendingCredential) {
+        // Reuse the credential from the failed link attempt — no second popup
+        userCredential = await signInWithCredential(auth, this.pendingCredential);
+        this.pendingCredential = null;
+        wasAnonymous = true;
+      } else if (currentUser && currentUser.isAnonymous && !forceSignIn) {
         // Link anonymous account to Google — preserves UID and all data
         try {
           userCredential = await linkWithPopup(currentUser, provider);
           wasAnonymous = true;
         } catch (linkError: any) {
           if (linkError.code === 'auth/credential-already-in-use') {
-            // Google account already exists — let the user decide
+            // Capture the credential so we can reuse it without another popup
+            this.pendingCredential = GoogleAuthProvider.credentialFromError(linkError);
             const error = new Error(
               'This Google account is already registered. Signing in will switch to that account and your current conversations and credits will not be carried over.'
             );

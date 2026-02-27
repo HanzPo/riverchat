@@ -118,7 +118,9 @@ async function handleGoogleSignIn(forceSignIn: boolean = false) {
   if (isLoading.value) return;
 
   errorMessage.value = '';
-  showAccountConflict.value = false;
+  if (!forceSignIn) {
+    showAccountConflict.value = false;
+  }
   isLoading.value = true;
 
   try {
