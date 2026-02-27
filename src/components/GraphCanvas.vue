@@ -177,27 +177,26 @@ const selectionBox = ref({
   height: 0,
 });
 const isRightDragging = ref(false);
-let suppressNextContextMenu = false;
-let rightClickStart: { x: number; y: number } | null = null;
 let rightButtonDown = false;
+let rightDragDetected = false;
+let rightClickStart: { x: number; y: number } | null = null;
+let pendingContextMenu: { type: 'pane' | 'node'; event: any } | null = null;
 
 function onDocMouseDown(event: MouseEvent) {
   if (event.button === 2) {
-    rightClickStart = { x: event.clientX, y: event.clientY };
     rightButtonDown = true;
-    suppressNextContextMenu = false;
-    console.log('[DEBUG] right mousedown at', event.clientX, event.clientY);
+    rightDragDetected = false;
+    rightClickStart = { x: event.clientX, y: event.clientY };
+    pendingContextMenu = null;
   }
 }
 
 function onDocMouseMove(event: MouseEvent) {
-  if (rightButtonDown && rightClickStart) {
+  if (rightButtonDown && rightClickStart && !rightDragDetected) {
     const dx = event.clientX - rightClickStart.x;
     const dy = event.clientY - rightClickStart.y;
-    const dist = dx * dx + dy * dy;
-    if (dist > 25 && !suppressNextContextMenu) {
-      suppressNextContextMenu = true;
-      console.log('[DEBUG] drag detected, suppress=true, dist=', Math.sqrt(dist));
+    if (dx * dx + dy * dy > 25) {
+      rightDragDetected = true;
     }
   }
 }
@@ -205,7 +204,18 @@ function onDocMouseMove(event: MouseEvent) {
 function onDocMouseUp(event: MouseEvent) {
   if (event.button === 2) {
     rightButtonDown = false;
-    console.log('[DEBUG] right mouseup, suppress=', suppressNextContextMenu);
+    // Show the pending context menu only if no drag happened
+    if (pendingContextMenu && !isRightDragging.value && !rightDragDetected) {
+      const pending = pendingContextMenu;
+      pendingContextMenu = null;
+      if (pending.type === 'pane') {
+        showPaneContextMenu(pending.event);
+      } else {
+        showNodeContextMenu(pending.event);
+      }
+    } else {
+      pendingContextMenu = null;
+    }
   }
 }
 
@@ -418,7 +428,6 @@ function updateSelectionBox(event: MouseEvent) {
   
   if (dragDistance > 5) {
     isRightDragging.value = true;
-    suppressNextContextMenu = true;
   }
 }
 
@@ -513,18 +522,19 @@ function clampMenuPosition(x: number, y: number, menuWidth: number = 220, menuHe
 }
 
 function handleNodeContextMenu(event: any) {
-  console.log('[DEBUG] handleNodeContextMenu called, suppress=', suppressNextContextMenu);
-  if (suppressNextContextMenu) {
-    suppressNextContextMenu = false;
-    console.log('[DEBUG] -> SUPPRESSED node context menu');
+  if (rightButtonDown) {
+    // Defer until mouseup to check if it was a drag
+    pendingContextMenu = { type: 'node', event };
     return;
   }
+  showNodeContextMenu(event);
+}
 
+function showNodeContextMenu(event: any) {
   const mouseEvent = event.event || event;
   const node = event.node?.data || event.data;
 
   if (node && mouseEvent) {
-    // Check if multiple nodes are selected
     const selectedNodes = getSelectedNodes.value || [];
     const selectedNodesData = selectedNodes.map(n => n.data as MessageNode);
 
@@ -548,17 +558,18 @@ function handlePaneClick() {
 }
 
 function handlePaneContextMenu(event: any) {
-  console.log('[DEBUG] handlePaneContextMenu called, suppress=', suppressNextContextMenu);
-  if (suppressNextContextMenu) {
-    suppressNextContextMenu = false;
-    console.log('[DEBUG] -> SUPPRESSED pane context menu');
+  if (rightButtonDown) {
+    // Defer until mouseup to check if it was a drag
+    pendingContextMenu = { type: 'pane', event };
     return;
   }
+  showPaneContextMenu(event);
+}
 
+function showPaneContextMenu(event: any) {
   const mouseEvent = event.event || event;
 
   if (mouseEvent) {
-    // Check if multiple nodes are currently selected
     const selectedNodes = getSelectedNodes.value || [];
     const selectedNodesData = selectedNodes.length > 1
       ? selectedNodes.map(n => n.data as MessageNode)
