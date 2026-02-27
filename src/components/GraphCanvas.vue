@@ -1,5 +1,5 @@
 <template>
-  <div class="graph-canvas" ref="canvasContainer">
+  <div class="graph-canvas" ref="canvasContainer" @mousedown.right="onRightMouseDown" @contextmenu="onCanvasContextMenu">
     <VueFlow
       v-model:nodes="flowNodes"
       v-model:edges="flowEdges"
@@ -178,6 +178,7 @@ const selectionBox = ref({
 });
 const isRightDragging = ref(false);
 let lastDragEndTime = 0;
+let rightMouseDownPos: { x: number; y: number } | null = null;
 
 // Watch for selection changes and emit to parent
 watch(
@@ -532,6 +533,25 @@ function handlePaneClick() {
   closeContextMenu();
 }
 
+function onRightMouseDown(event: MouseEvent) {
+  rightMouseDownPos = { x: event.clientX, y: event.clientY };
+}
+
+function onCanvasContextMenu(event: MouseEvent) {
+  // If the mouse moved more than 5px from mousedown, it was a drag — suppress
+  if (rightMouseDownPos) {
+    const dx = event.clientX - rightMouseDownPos.x;
+    const dy = event.clientY - rightMouseDownPos.y;
+    if (Math.sqrt(dx * dx + dy * dy) > 5) {
+      event.preventDefault();
+      event.stopPropagation();
+      rightMouseDownPos = null;
+      return;
+    }
+  }
+  rightMouseDownPos = null;
+}
+
 function handlePaneContextMenu(event: any) {
   // Don't show context menu if we just completed a drag selection
   if (isRightDragging.value || Date.now() - lastDragEndTime < 200) {
@@ -560,10 +580,16 @@ function handlePaneContextMenu(event: any) {
   }
 }
 
+let dragBatchTimeout: ReturnType<typeof setTimeout> | null = null;
+
 function handleNodeDragStart() {
   // Mark that dragging has started - this prevents syncFlowNodes from running
   isDragging.value = true;
   draggedNodes.value.clear();
+  if (dragBatchTimeout) {
+    clearTimeout(dragBatchTimeout);
+    dragBatchTimeout = null;
+  }
 }
 
 function handleNodeDrag() {
@@ -574,45 +600,47 @@ function handleNodeDrag() {
 async function handleNodeDragStop(event: any) {
   const nodeId = event.node?.id;
   const position = event.node?.position;
-  
+
   if (!nodeId || !position) return;
 
   // Get all currently selected nodes from VueFlow
   const selectedNodes = getSelectedNodes.value || [];
-  
+
   // If multiple nodes are selected, batch update all of them
   if (selectedNodes.length > 1) {
     // Add this node to the dragged nodes set
     draggedNodes.value.add(nodeId);
-    
-    // Check if we've received drag-stop events for all selected nodes
-    const allSelectedIds = selectedNodes.map(n => n.id);
-    const allDragged = allSelectedIds.every(id => draggedNodes.value.has(id));
-    
-    if (allDragged) {
-      // All selected nodes have finished dragging, collect all positions from VueFlow
+
+    // Use a short timeout to batch all dragStop events that arrive in
+    // the same frame, instead of waiting for every single selected node.
+    // This avoids getting stuck if VueFlow doesn't fire dragStop for
+    // all nodes (e.g., node was deselected during drag).
+    if (dragBatchTimeout) clearTimeout(dragBatchTimeout);
+    dragBatchTimeout = setTimeout(async () => {
+      dragBatchTimeout = null;
+      // Collect positions for all selected nodes from VueFlow's current state
       const updates = selectedNodes
         .filter(node => node.position)
         .map(node => ({
           nodeId: node.id,
           position: { x: node.position!.x, y: node.position!.y }
         }));
-      
+
       // Emit a single batch update event
       emit('update-positions-batch', updates);
-      
+
       // Clear the dragged nodes set
       draggedNodes.value.clear();
-      
+
       // Wait for Vue to process the update before allowing sync
       await nextTick();
       await nextTick(); // Double nextTick to ensure props have propagated
       isDragging.value = false;
-    }
+    }, 50);
   } else {
     // Single node drag - update immediately
     emit('update-position', nodeId, { x: position.x, y: position.y });
-    
+
     // Wait for Vue to process the update before allowing sync
     await nextTick();
     await nextTick(); // Double nextTick to ensure props have propagated
@@ -736,18 +764,24 @@ onMounted(() => {
 onUnmounted(() => {
   // Remove click listener
   window.removeEventListener('click', handleClickOutside);
-  
+
   // Remove keyboard listener
   window.removeEventListener('keydown', handleKeyboardDelete);
-  
+
   if (cleanupSelectionListener) {
     cleanupSelectionListener();
   }
-  
+
   // Clean up any lingering event listeners
   document.removeEventListener('mousemove', updateSelectionBox);
   document.removeEventListener('mouseup', endSelectionBox);
   document.removeEventListener('contextmenu', preventContextMenu);
+
+  // Cancel any pending drag batch timeout
+  if (dragBatchTimeout) {
+    clearTimeout(dragBatchTimeout);
+    dragBatchTimeout = null;
+  }
 });
 </script>
 
