@@ -97,7 +97,7 @@
       <!-- Right Panel: Chat History -->
       <div 
         ref="chatPanel"
-        v-if="(selectedNodeId || isNewRootMode) && !hasMultipleNodesSelected" 
+        v-if="(selectedNodeId || isNewRootMode) && !hasMultipleNodesSelected && !showChatModal"
         class="flex flex-col relative"
         :style="{ 
           width: `${chatPanelWidth}px`, 
@@ -1023,8 +1023,8 @@ function setupKeyboardShortcuts() {
       showRiverDashboard.value = true;
     }
 
-    // Ctrl/Cmd + Shift + R: Create new root node (avoid hijacking browser reload)
-    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'R') {
+    // Alt/Option + R: Create new root node
+    if (e.altKey && (e.key === 'r' || e.key === 'R')) {
       e.preventDefault();
       if (currentRiver.value) {
         handleCreateRootNode();

@@ -58,9 +58,7 @@
               </div>
               <div class="shortcut-item">
                 <div class="shortcut-keys">
-                  <kbd>{{ ctrlKey }}</kbd>
-                  <span>+</span>
-                  <kbd>Shift</kbd>
+                  <kbd>Alt</kbd>
                   <span>+</span>
                   <kbd>R</kbd>
                 </div>
