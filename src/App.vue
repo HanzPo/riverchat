@@ -87,7 +87,7 @@
             <p class="text-sm mb-6 font-medium" style="color: var(--color-text-secondary);">
               Create a new river to start your first conversation
             </p>
-            <button @click="handleCreateFirstRiver" class="btn-material" style="padding: 10px 20px; font-size: 14px; font-weight: 600;">
+            <button @click="showCreateRiver = true" class="btn-material" style="padding: 10px 20px; font-size: 14px; font-weight: 600;">
               + Create River
             </button>
           </div>
@@ -250,6 +250,13 @@
       @authenticated="handleAuthenticated"
     />
 
+    <!-- Create River Modal -->
+    <CreateRiverModal
+      :is-open="showCreateRiver"
+      @create="handleCreateRiverFromModal"
+      @close="showCreateRiver = false"
+    />
+
     <!-- Toast Notification -->
     <div v-if="toast.visible && !showSettings" class="toast z-[500]" :class="`toast-${toast.type}`">
       {{ toast.message }}
@@ -288,6 +295,7 @@ const MessageViewerModal = defineAsyncComponent(() => import('./components/Messa
 const ConfirmationModal = defineAsyncComponent(() => import('./components/ConfirmationModal.vue'));
 const KeyboardShortcutsModal = defineAsyncComponent(() => import('./components/KeyboardShortcutsModal.vue'));
 const AuthModal = defineAsyncComponent(() => import('./components/AuthModal.vue'));
+const CreateRiverModal = defineAsyncComponent(() => import('./components/CreateRiverModal.vue'));
 
 const {
   currentRiver,
@@ -323,6 +331,7 @@ const showMessageViewer = ref(false);
 const showHelp = ref(false);
 const showChatModal = ref(false);
 const showAuth = ref(false);
+const showCreateRiver = ref(false);
 const viewingMessage = ref<MessageNode | null>(null);
 const isNewRootMode = ref(false);
 const hasMultipleNodesSelected = ref(false);
@@ -599,10 +608,10 @@ async function handleShowRiverDashboard() {
   showRiverDashboard.value = true;
 }
 
-async function handleCreateFirstRiver() {
+async function handleCreateRiverFromModal(name: string) {
   isRiverOperationLoading.value = true;
   try {
-    const river = await createRiver('My First River');
+    const river = await createRiver(name);
     showToast(`Created "${river.name}"`, 'success');
   } catch (error) {
     showToast('Failed to create river', 'error');
@@ -664,8 +673,8 @@ async function handleDeleteRiver(riverId: string) {
 // Message Handling
 async function handleSendMessage(content: string, models: LLMModel[], webSearchEnabled: boolean) {
   if (!currentRiver.value) {
-    await handleCreateFirstRiver();
-    if (!currentRiver.value) return; // River creation failed
+    showCreateRiver.value = true;
+    return;
   }
 
   isSendingMessage.value = true;
@@ -698,8 +707,8 @@ async function handleSendMessage(content: string, models: LLMModel[], webSearchE
 
 async function handleResend(userNodeId: string, models: LLMModel[], webSearchEnabled: boolean) {
   if (!currentRiver.value) {
-    await handleCreateFirstRiver();
-    if (!currentRiver.value) return; // River creation failed
+    showCreateRiver.value = true;
+    return;
   }
 
   const userNode = currentRiver.value?.nodes[userNodeId];
@@ -952,6 +961,7 @@ function showToast(message: string, type: 'info' | 'success' | 'error' = 'info')
 function isAnyModalOpen(): boolean {
   return showSettings.value || showRiverDashboard.value || showMessageViewer.value ||
          showHelp.value || showChatModal.value || showAuth.value || showWelcome.value ||
+         showCreateRiver.value ||
          deleteConfirmation.value.isOpen || editConfirmation.value.isOpen || deleteBatchConfirmation.value.isOpen;
 }
 
@@ -985,6 +995,8 @@ function setupKeyboardShortcuts() {
         showRiverDashboard.value = false;
       } else if (showAuth.value) {
         showAuth.value = false;
+      } else if (showCreateRiver.value) {
+        showCreateRiver.value = false;
       } else if (showWelcome.value) {
         showWelcome.value = false;
       } else if (showSettings.value) {

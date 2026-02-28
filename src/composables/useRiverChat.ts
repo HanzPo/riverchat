@@ -67,9 +67,9 @@ export function useRiverChat() {
     await FirestoreStorageService.saveSettings(newSettings);
   }, 2000); // Save at most once per 2 seconds
 
-  // Save current river whenever it changes (debounced)
+  // Save current river whenever it changes (debounced, skip during initialization)
   watch(currentRiver, (river) => {
-    if (river) {
+    if (river && !isInitializing.value) {
       debouncedSaveRiver(river);
     }
   }, { deep: true });
@@ -102,6 +102,9 @@ export function useRiverChat() {
 
     await FirestoreStorageService.saveRiver(river);
     currentRiver.value = river;
+    // Save as last visited river
+    settings.value.lastVisitedRiverId = river.id;
+    await FirestoreStorageService.saveSettings(settings.value);
     // Force refresh to ensure new river appears immediately
     await refreshRivers(true);
 
@@ -131,6 +134,9 @@ export function useRiverChat() {
     if (river) {
       currentRiver.value = river;
       selectedNodeId.value = null;
+      // Save as last visited river
+      settings.value.lastVisitedRiverId = riverId;
+      await FirestoreStorageService.saveSettings(settings.value);
 
       // Track river loaded
       const analytics = usePostHog();
@@ -152,6 +158,11 @@ export function useRiverChat() {
     if (currentRiver.value?.id === riverId) {
       currentRiver.value = null;
       selectedNodeId.value = null;
+    }
+    // Clear lastVisitedRiverId if the deleted river was the last visited
+    if (settings.value.lastVisitedRiverId === riverId) {
+      settings.value.lastVisitedRiverId = null;
+      await FirestoreStorageService.saveSettings(settings.value);
     }
     // Force refresh to ensure deleted river is removed immediately
     await refreshRivers(true);
@@ -595,6 +606,8 @@ export function useRiverChat() {
   // Clear all state (for logout)
   function clearState(): void {
     abortActiveStreams();
+    debouncedSaveRiver.cancel();
+    debouncedSaveSettings.cancel();
     currentRiver.value = null;
     selectedNodeId.value = null;
   }
@@ -618,6 +631,7 @@ export function useRiverChat() {
 
     isLoading.value = true;
     isInitializing.value = true; // Prevent auto-save during load
+    debouncedSaveRiver.cancel(); // Cancel any pending river save to prevent cross-user writes
     debouncedSaveSettings.cancel(); // Cancel any pending debounced save to prevent stale writes
 
     initPromise = (async () => {
@@ -652,12 +666,15 @@ export function useRiverChat() {
           settings.value.lastModelRefresh = Date.now();
         }
 
-        // Load rivers
-        await refreshRivers();
+        // Load rivers (bypass cache on force refresh to avoid stale cross-user data)
+        await refreshRivers(forceRefresh);
 
-        // Load the most recent river if available
-        if (allRivers.value && allRivers.value.length > 0 && allRivers.value[0]) {
-          await loadRiver(allRivers.value[0].id);
+        // Load the last visited river, or fall back to the most recent river
+        if (allRivers.value && allRivers.value.length > 0) {
+          const lastVisitedId = settings.value.lastVisitedRiverId;
+          const lastVisitedExists = lastVisitedId && allRivers.value.some(r => r.id === lastVisitedId);
+          const riverToLoad = lastVisitedExists ? lastVisitedId! : allRivers.value[0]!.id;
+          await loadRiver(riverToLoad);
         }
       } catch (error) {
         console.error('Failed to initialize:', error);
