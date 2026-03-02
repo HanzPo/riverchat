@@ -136,7 +136,9 @@ export function useRiverChat() {
       selectedNodeId.value = null;
       // Save as last visited river
       settings.value.lastVisitedRiverId = riverId;
-      await FirestoreStorageService.saveSettings(settings.value);
+      if (!isInitializing.value) {
+        await FirestoreStorageService.saveSettings(settings.value);
+      }
 
       // Track river loaded
       const analytics = usePostHog();

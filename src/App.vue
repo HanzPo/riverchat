@@ -332,6 +332,7 @@ const showHelp = ref(false);
 const showChatModal = ref(false);
 const showAuth = ref(false);
 const showCreateRiver = ref(false);
+const pendingMessage = ref<{ content: string; models: LLMModel[]; webSearchEnabled: boolean } | null>(null);
 const viewingMessage = ref<MessageNode | null>(null);
 const isNewRootMode = ref(false);
 const hasMultipleNodesSelected = ref(false);
@@ -613,7 +614,14 @@ async function handleCreateRiverFromModal(name: string) {
   try {
     const river = await createRiver(name);
     showToast(`Created "${river.name}"`, 'success');
+    // Send any pending message that was queued before the river existed
+    if (pendingMessage.value && currentRiver.value) {
+      const { content, models, webSearchEnabled } = pendingMessage.value;
+      pendingMessage.value = null;
+      await handleSendMessage(content, models, webSearchEnabled);
+    }
   } catch (error) {
+    pendingMessage.value = null;
     showToast('Failed to create river', 'error');
   } finally {
     isRiverOperationLoading.value = false;
@@ -673,6 +681,7 @@ async function handleDeleteRiver(riverId: string) {
 // Message Handling
 async function handleSendMessage(content: string, models: LLMModel[], webSearchEnabled: boolean) {
   if (!currentRiver.value) {
+    pendingMessage.value = { content, models, webSearchEnabled };
     showCreateRiver.value = true;
     return;
   }
