@@ -254,7 +254,7 @@
     <CreateRiverModal
       :is-open="showCreateRiver"
       @create="handleCreateRiverFromModal"
-      @close="showCreateRiver = false"
+      @close="showCreateRiver = false; pendingMessage = null"
     />
 
     <!-- Toast Notification -->
@@ -1006,6 +1006,7 @@ function setupKeyboardShortcuts() {
         showAuth.value = false;
       } else if (showCreateRiver.value) {
         showCreateRiver.value = false;
+        pendingMessage.value = null;
       } else if (showWelcome.value) {
         showWelcome.value = false;
       } else if (showSettings.value) {
