@@ -40,6 +40,7 @@ export interface Settings {
   lastUsedModelId: string | null; // Model ID of last used model
   selectedModelIds: string[]; // Currently selected model IDs for chat
   lastModelRefresh?: number; // Timestamp of last model list refresh
+  lastVisitedRiverId?: string | null; // ID of the last visited river
 }
 
 export type NodeType = 'user' | 'ai';

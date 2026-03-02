@@ -146,6 +146,7 @@ export class FirestoreStorageService {
           lastUsedModelId: data.lastUsedModelId || data.lastUsedModel?.id || null,
           selectedModelIds: data.selectedModelIds || (data.lastChatSelectedModels?.map((m: { id: string }) => m.id)) || [],
           lastModelRefresh: data.lastModelRefresh,
+          lastVisitedRiverId: data.lastVisitedRiverId || null,
         };
 
         CacheService.cacheSettings(settings);
@@ -173,6 +174,7 @@ export class FirestoreStorageService {
         lastUsedModelId: settings.lastUsedModelId,
         selectedModelIds: settings.selectedModelIds || [],
         lastModelRefresh: settings.lastModelRefresh,
+        lastVisitedRiverId: settings.lastVisitedRiverId || null,
         updatedAt: serverTimestamp(),
       });
 
@@ -273,6 +275,7 @@ export class FirestoreStorageService {
       lastUsedModelId: raw.lastUsedModelId || (raw as any).lastUsedModel?.id || null,
       selectedModelIds: raw.selectedModelIds || ((raw as any).lastChatSelectedModels?.map((m: { id: string }) => m.id)) || [],
       lastModelRefresh: raw.lastModelRefresh,
+      lastVisitedRiverId: raw.lastVisitedRiverId || null,
     };
   }
 
