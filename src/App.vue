@@ -610,18 +610,19 @@ async function handleShowRiverDashboard() {
 }
 
 async function handleCreateRiverFromModal(name: string) {
+  // Capture pending message before the first await, because the modal's
+  // synchronous 'close' event will null it out while we're suspended.
+  const savedPendingMessage = pendingMessage.value;
+  pendingMessage.value = null;
   isRiverOperationLoading.value = true;
   try {
     const river = await createRiver(name);
     showToast(`Created "${river.name}"`, 'success');
     // Send any pending message that was queued before the river existed
-    if (pendingMessage.value && currentRiver.value) {
-      const { content, models, webSearchEnabled } = pendingMessage.value;
-      pendingMessage.value = null;
-      await handleSendMessage(content, models, webSearchEnabled);
+    if (savedPendingMessage && currentRiver.value) {
+      await handleSendMessage(savedPendingMessage.content, savedPendingMessage.models, savedPendingMessage.webSearchEnabled);
     }
   } catch (error) {
-    pendingMessage.value = null;
     showToast('Failed to create river', 'error');
   } finally {
     isRiverOperationLoading.value = false;
@@ -715,10 +716,7 @@ async function handleSendMessage(content: string, models: LLMModel[], webSearchE
 }
 
 async function handleResend(userNodeId: string, models: LLMModel[], webSearchEnabled: boolean) {
-  if (!currentRiver.value) {
-    showCreateRiver.value = true;
-    return;
-  }
+  if (!currentRiver.value) return;
 
   const userNode = currentRiver.value?.nodes[userNodeId];
   if (!userNode || userNode.type !== 'user') {
