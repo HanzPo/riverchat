@@ -41,7 +41,7 @@ jobs:
           echo "GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json" >> $GITHUB_ENV
 
       - name: Deploy to Firebase
-        run: firebase deploy --only functions,firestore,database,storage --project riverchat-ac2f0 --force
+        run: firebase deploy --force
 
       - name: Cleanup credentials
         if: always()

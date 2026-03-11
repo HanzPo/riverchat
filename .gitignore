@@ -39,7 +39,6 @@ build/
 .DS_Store
 Thumbs.db
 .firebase
-.firebaserc
 .claude
 
 # Cloud Functions
