@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
 import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath, URL } from 'node:url'
@@ -11,9 +11,14 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url))
     }
   },
+  test: {
+    globals: true,
+    environment: 'happy-dom',
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
+  },
   build: {
-    // Enable source maps for production debugging
-    sourcemap: true,
+    // Disable source maps in production to prevent source code exposure
+    sourcemap: false,
     
     // Increase chunk size warning limit (optional, but helps with large deps like Firebase)
     chunkSizeWarningLimit: 600,
@@ -48,7 +53,7 @@ export default defineConfig({
     minify: 'terser',
     terserOptions: {
       compress: {
-        drop_console: false, // Keep console for now, set to true for production
+        drop_console: true, // Remove console logs in production
         drop_debugger: true,
         pure_funcs: ['console.debug'] // Remove console.debug
       }

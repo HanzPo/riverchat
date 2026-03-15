@@ -130,11 +130,37 @@
       </div>
     </div>
 
+    <!-- Onboarding Tooltip -->
+    <OnboardingTooltip
+      :visible="!!tour.activeTip.value && !showSettings && !showWelcome && !showOnboarding"
+      :tip="tour.activeTip.value"
+      :x="tooltipPosition.x"
+      :y="tooltipPosition.y"
+      @dismiss="handleDismissTip"
+    />
+
+    <!-- Auth Prompt Banner -->
+    <AuthPromptBanner
+      v-if="currentUser?.isAnonymous && !showAuth && !showWelcome && !showOnboarding"
+      :visible="showAuthPrompt"
+      :message="authPromptMessage"
+      @sign-up="showAuth = true; analytics.capture('upgrade_prompt_clicked', { source: 'auth_banner' })"
+    />
+
     <!-- Modals -->
+    <!-- A/B tested onboarding: control = WelcomeModal, inline-chat = OnboardingModal -->
     <WelcomeModal
+      v-if="onboardingVariant === 'control'"
       :is-open="showWelcome"
       :can-dismiss="true"
       @close="showWelcome = false"
+    />
+    <OnboardingModal
+      v-else
+      :is-open="showOnboarding"
+      :can-dismiss="true"
+      @send-first-message="handleFirstMessage"
+      @skip="showOnboarding = false"
     />
 
     <SettingsPage
@@ -246,6 +272,8 @@
     <!-- Auth Modal -->
     <AuthModal
       :is-open="showAuth"
+      :river-count="allRivers?.length ?? 0"
+      :message-count="totalMessageCount"
       @close="showAuth = false"
       @authenticated="handleAuthenticated"
     />
@@ -255,6 +283,16 @@
       :is-open="showCreateRiver"
       @create="handleCreateRiverFromModal"
       @close="showCreateRiver = false; pendingMessage = null"
+    />
+
+    <!-- Credit Warning Banner -->
+    <CreditWarningBanner
+      v-if="hasInitialized && subscription.tier.value === 'free'"
+      :is-low="subscription.isLowBalance.value"
+      :is-critical="subscription.isCriticalBalance.value"
+      :is-zero="subscription.isZeroBalance.value"
+      @upgrade="handleCreditWarningUpgrade('pro')"
+      @upgrade-to="handleCreditWarningUpgrade"
     />
 
     <!-- Toast Notification -->
@@ -275,6 +313,7 @@
 import { ref, computed, onMounted, onUnmounted, watch, nextTick, defineAsyncComponent } from 'vue';
 import { useRiverChat } from './composables/useRiverChat';
 import { usePostHog } from './composables/usePostHog';
+import { useOnboardingTour } from './composables/useOnboardingTour';
 import type { MessageNode, LLMModel } from './types';
 import { resolveModelIds, DEFAULT_MODEL_ID } from './types';
 import { Folder, Search, HelpCircle, Settings, Plus, User as UserIcon } from 'lucide-vue-next';
@@ -289,6 +328,9 @@ import ChatHistory from './components/ChatHistory.vue';
 // Non-critical components lazy loaded
 const ChatModal = defineAsyncComponent(() => import('./components/ChatModal.vue'));
 import WelcomeModal from './components/WelcomeModal.vue';
+const OnboardingModal = defineAsyncComponent(() => import('./components/OnboardingModal.vue'));
+const OnboardingTooltip = defineAsyncComponent(() => import('./components/OnboardingTooltip.vue'));
+const AuthPromptBanner = defineAsyncComponent(() => import('./components/AuthPromptBanner.vue'));
 const SettingsPage = defineAsyncComponent(() => import('./components/SettingsPage.vue'));
 const RiverDashboard = defineAsyncComponent(() => import('./components/RiverDashboard.vue'));
 const MessageViewerModal = defineAsyncComponent(() => import('./components/MessageViewerModal.vue'));
@@ -296,6 +338,7 @@ const ConfirmationModal = defineAsyncComponent(() => import('./components/Confir
 const KeyboardShortcutsModal = defineAsyncComponent(() => import('./components/KeyboardShortcutsModal.vue'));
 const AuthModal = defineAsyncComponent(() => import('./components/AuthModal.vue'));
 const CreateRiverModal = defineAsyncComponent(() => import('./components/CreateRiverModal.vue'));
+const CreditWarningBanner = defineAsyncComponent(() => import('./components/CreditWarningBanner.vue'));
 
 const {
   currentRiver,
@@ -338,6 +381,16 @@ const isNewRootMode = ref(false);
 const hasMultipleNodesSelected = ref(false);
 const hasInitialized = ref(false);
 const showMinimap = ref(true);
+const showOnboarding = ref(false);
+const onboardingVariant = ref<string>('control');
+
+// Onboarding tour
+const tour = useOnboardingTour();
+const tooltipPosition = ref({ x: 60, y: 60 });
+
+// Auth prompt state
+const authPromptMessage = ref('');
+const showAuthPrompt = ref(false);
 
 // Authentication state
 const currentUser = ref<User | null>(null);
@@ -381,6 +434,12 @@ const toast = ref({
 const currentPath = computed(() => {
   if (!selectedNodeId.value) return [];
   return getPathToNode(selectedNodeId.value);
+});
+
+// Total message count across all rivers (for auth modal)
+const totalMessageCount = computed(() => {
+  if (!allRivers.value) return 0;
+  return allRivers.value.reduce((sum, r) => sum + Object.keys(r.nodes).length, 0);
 });
 
 // Update page title when river changes
@@ -522,15 +581,42 @@ onMounted(async () => {
     }
   }
 
-  // Show welcome modal for new users (anonymous with no rivers)
-  // Only show after initialization is complete to avoid race conditions
+  // Initialize onboarding tour from saved settings
+  tour.initFromSettings(settings.value);
+  if (!settings.value.firstVisitTimestamp) {
+    settings.value.firstVisitTimestamp = Date.now();
+  }
+
+  // Determine onboarding variant via PostHog feature flag
+  const variant = analytics.getFeatureFlag('onboarding-variant');
+  onboardingVariant.value = (typeof variant === 'string' && ['control', 'inline-chat', 'auto-river'].includes(variant))
+    ? variant
+    : 'inline-chat'; // default to new experience
+
+  // New user onboarding: auto-create a river and open chat panel so they can
+  // start chatting immediately, then show the onboarding modal on top.
   if (hasInitialized.value && (!currentUser.value || currentUser.value.isAnonymous) && allRivers.value.length === 0) {
-    showWelcome.value = true;
+    try {
+      await createRiver('My First River');
+      isNewRootMode.value = true;
+      analytics.capture('onboarding_river_auto_created');
+    } catch (error) {
+      console.error('[App] Failed to auto-create onboarding river:', error);
+    }
+
+    analytics.capture('onboarding_variant_shown', { variant: onboardingVariant.value });
+    if (onboardingVariant.value === 'control') {
+      showWelcome.value = true;
+    } else if (onboardingVariant.value === 'inline-chat') {
+      showOnboarding.value = true;
+    }
+    // 'auto-river' variant: skip modal entirely, user sees the river + chat input directly
   }
 
   // Handle Stripe checkout redirects
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.get('checkout') === 'success') {
+    analytics.capture('checkout_completed');
     showToast('Subscription updated successfully!', 'success');
     // Refresh balance to reflect new tier
     subscription.refreshBalance();
@@ -538,6 +624,7 @@ onMounted(async () => {
     // Clean up URL
     window.history.replaceState({}, '', window.location.pathname);
   } else if (urlParams.get('checkout') === 'cancel') {
+    analytics.capture('checkout_cancelled');
     showToast('Checkout cancelled', 'info');
     window.history.replaceState({}, '', window.location.pathname);
   } else if (urlParams.get('topup') === 'success') {
@@ -563,6 +650,62 @@ onUnmounted(() => {
     keyboardHandler = null;
   }
 });
+
+// Credit warning handler
+function handleCreditWarningUpgrade(tier: 'pro' | 'max') {
+  analytics.capture('upgrade_prompt_clicked', { source: 'credit_warning', target_tier: tier });
+  subscription.upgradeToTier(tier);
+}
+
+// Onboarding: handle first message sent from OnboardingModal
+async function handleFirstMessage(content: string) {
+  showOnboarding.value = false;
+  analytics.capture('first_message_sent', { source: 'onboarding_modal' });
+
+  // If no river exists yet (shouldn't happen since we auto-create, but safety)
+  if (!currentRiver.value) {
+    const name = content.slice(0, 30) + (content.length > 30 ? '...' : '');
+    await createRiver(name);
+    isNewRootMode.value = true;
+  }
+
+  // Resolve default models and send
+  const models = resolveModelIds(
+    settings.value.selectedModelIds.length > 0
+      ? settings.value.selectedModelIds
+      : [DEFAULT_MODEL_ID],
+    subscription.availableModels.value,
+  );
+  if (models.length > 0) {
+    await handleSendMessage(content, models, false);
+  }
+}
+
+// Onboarding tour: dismiss tooltip and persist
+function handleDismissTip(tipId: string) {
+  tour.dismissTip(tipId);
+  updateSettings({ ...settings.value, ...tour.getSettingsUpdate() });
+}
+
+// Auth prompt: check milestones to trigger contextual auth prompts
+function checkAuthPromptMilestones() {
+  if (!currentUser.value?.isAnonymous) return;
+
+  const count = tour.messageCount.value;
+  if (count === 3) {
+    authPromptMessage.value = 'Sign in to save your conversations across devices';
+    showAuthPrompt.value = true;
+    analytics.capture('upgrade_prompt_shown', { source: 'auth_banner', trigger: 'third_message' });
+  } else if (allRivers.value.length >= 2 && count >= 5) {
+    authPromptMessage.value = `You have ${allRivers.value.length} conversations. Sign in to keep them safe.`;
+    showAuthPrompt.value = true;
+    analytics.capture('upgrade_prompt_shown', { source: 'auth_banner', trigger: 'multiple_rivers' });
+  } else if (settings.value.firstVisitTimestamp && Date.now() - settings.value.firstVisitTimestamp > 7 * 24 * 60 * 60 * 1000) {
+    authPromptMessage.value = 'You\'ve been using RiverChat for a week. Sign in to sync your data.';
+    showAuthPrompt.value = true;
+    analytics.capture('upgrade_prompt_shown', { source: 'auth_banner', trigger: 'seven_days' });
+  }
+}
 
 // Authentication handlers
 async function handleAuthenticated() {
@@ -633,6 +776,7 @@ async function handleCreateRiver(name: string) {
   isRiverOperationLoading.value = true;
   try {
     const river = await createRiver(name);
+    analytics.capture('river_created', { source: 'dashboard' });
     showToast(`Created "${river.name}"`, 'success');
   } catch (error) {
     showToast('Failed to create river', 'error');
@@ -705,9 +849,24 @@ async function handleSendMessage(content: string, models: LLMModel[], webSearchE
     const userNode = createUserNode(content, parentId);
     selectNode(userNode.id);
 
+    // Funnel tracking
+    analytics.capture('message_sent', {
+      model_count: models.length,
+      is_root: parentId === null,
+      web_search: webSearchEnabled,
+    });
+
+    // Onboarding tour: record message milestone
+    tour.recordMessage();
+    updateSettings({ ...settings.value, ...tour.getSettingsUpdate() });
+    checkAuthPromptMilestones();
+
     // Generate AI responses for all selected models in parallel
     const promises = models.map(model => generateAIResponse(userNode.id, model, webSearchEnabled));
     await Promise.all(promises);
+
+    // Onboarding tour: record AI response milestone
+    tour.recordAIResponse();
   } catch (error) {
     showToast(error instanceof Error ? error.message : 'Failed to send message', 'error');
   } finally {

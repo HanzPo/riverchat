@@ -134,8 +134,74 @@
             </span>
           </div>
         </div>
+
+        <!-- Multi-model prompt: shown once after first AI response with single model (3B) -->
+        <div
+          v-if="showMultiModelPrompt"
+          class="p-3 rounded-lg text-center animate-fade-in"
+          style="background: rgba(13, 153, 255, 0.08); border: 1px solid rgba(13, 153, 255, 0.2);"
+        >
+          <p class="text-xs font-medium mb-2" style="color: var(--color-primary);">
+            Want to see how another AI answers?
+          </p>
+          <button
+            @click="addModelSlot(); multiModelPromptDismissed = true; chatAnalytics.capture('multi_model_prompt_clicked')"
+            class="btn-material text-xs"
+            style="padding: 5px 12px; font-weight: 600; background: var(--color-primary-muted); color: var(--color-primary); border-color: var(--color-primary);"
+          >
+            + Add a second model
+          </button>
+          <button
+            @click="multiModelPromptDismissed = true"
+            class="block mx-auto mt-1 text-[10px] bg-transparent border-none cursor-pointer"
+            style="color: var(--color-text-tertiary);"
+          >
+            Dismiss
+          </button>
+        </div>
+
+        <!-- Post-response upgrade nudge: shown on free tier (2D) -->
+        <div
+          v-if="showUpgradeNudge"
+          class="p-3 rounded-lg animate-fade-in"
+          style="background: rgba(162, 89, 255, 0.08); border: 1px solid rgba(162, 89, 255, 0.2);"
+        >
+          <p class="text-xs font-medium mb-1" style="color: var(--color-accent);">
+            This response used {{ lastAIModelName }}.
+          </p>
+          <p class="text-[11px] mb-2" style="color: var(--color-text-secondary);">
+            Try premium models like Claude or GPT-5 with Pro.
+          </p>
+          <div class="flex items-center gap-2">
+            <button
+              @click="chatAnalytics.capture('upgrade_prompt_clicked', { source: 'post_response', target_tier: 'pro' }); subscription.upgradeToTier('pro')"
+              class="btn-material text-xs"
+              style="padding: 5px 12px; font-weight: 600; background: rgba(162, 89, 255, 0.15); color: var(--color-accent); border-color: rgba(162, 89, 255, 0.3);"
+            >
+              Upgrade to Pro
+            </button>
+            <button
+              @click="upgradeNudgeDismissed = true"
+              class="text-[10px] bg-transparent border-none cursor-pointer"
+              style="color: var(--color-text-tertiary);"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
       </div>
     </div>
+
+    <!-- Web Search Upgrade Popover -->
+    <UpgradePopover
+      :visible="webSearchUpgrade.visible"
+      :position="webSearchUpgrade.position"
+      title="Web search"
+      description="Search the web during AI responses for up-to-date information."
+      target-tier="pro"
+      @close="webSearchUpgrade.visible = false"
+      @upgrade="(tier: 'pro' | 'max') => { webSearchUpgrade.visible = false; chatAnalytics.capture('upgrade_prompt_clicked', { source: 'web_search', target_tier: tier }); subscription.upgradeToTier(tier); }"
+    />
 
     <!-- Input Area -->
     <div class="p-4 card-material">
@@ -237,10 +303,10 @@
          <!-- Model Selection (Dropdowns) -->
          <div class="mb-2 flex items-center gap-1.5 flex-wrap">
            <button
-             @click="canEnableWebSearch ? webSearchEnabled = !webSearchEnabled : null"
+             @click="handleWebSearchClick($event)"
              class="flex items-center justify-center rounded-lg transition-all"
-             :class="{ 'hover:opacity-80': canEnableWebSearch, 'cursor-not-allowed opacity-50': !canEnableWebSearch }"
-             :style="'width: 18px; height: 18px; background: transparent; cursor: ' + (canEnableWebSearch ? 'pointer' : 'not-allowed') + ';'"
+             :class="{ 'hover:opacity-80': canEnableWebSearch, 'cursor-pointer opacity-50 hover:opacity-70': !canEnableWebSearch }"
+             :style="'width: 18px; height: 18px; background: transparent; cursor: pointer;'"
              :title="canEnableWebSearch ? (webSearchEnabled ? 'Web search enabled' : 'Web search disabled') : 'Upgrade to use web search'"
            >
              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="webSearchEnabled && canEnableWebSearch ? 'color: var(--color-primary);' : 'color: var(--color-text-tertiary);'">
@@ -309,14 +375,18 @@
 </template>
 
 <script setup lang="ts">
-import { watch, nextTick } from 'vue';
+import { ref, computed, watch, nextTick } from 'vue';
 import type { MessageNode, Settings } from '../types';
 import { User, Bot, GitBranch, AlertTriangle, X } from 'lucide-vue-next';
 import { renderMarkdown, formatTime, getBranchCount } from '../utils/chat';
 import TextHighlightPopover from './TextHighlightPopover.vue';
 import ModelDropdown from './ModelDropdown.vue';
+import UpgradePopover from './UpgradePopover.vue';
 import { useChatPanel } from '../composables/useChatPanel';
+import { usePostHog } from '../composables/usePostHog';
 import type { User as FirebaseUser } from 'firebase/auth';
+
+const chatAnalytics = usePostHog();
 
 interface Props {
   path: MessageNode[];
@@ -341,18 +411,44 @@ interface Emits {
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
+// Multi-model prompt: show once after first AI response with single model
+const multiModelPromptDismissed = ref(false);
+const showMultiModelPrompt = computed(() => {
+  if (multiModelPromptDismissed.value) return false;
+  if (props.settings?.hasSeenMultiModelPrompt) return false;
+  // Show after first AI response when user has only 1 model selected
+  const hasAIResponse = props.path.some(m => m.type === 'ai' && m.state === 'complete');
+  return hasAIResponse && selectedModelIds.value.length === 1;
+});
+
+// Post-response upgrade nudge (2D): show on free tier after AI responses
+const upgradeNudgeDismissed = ref(false);
+const showUpgradeNudge = computed(() => {
+  if (upgradeNudgeDismissed.value) return false;
+  if (subscription.tier.value !== 'free') return false;
+  // Show after the 2nd completed AI response
+  const completedAI = props.path.filter(m => m.type === 'ai' && m.state === 'complete');
+  return completedAI.length >= 2;
+});
+const lastAIModelName = computed(() => {
+  const aiMessages = props.path.filter(m => m.type === 'ai' && m.state === 'complete');
+  return aiMessages.length > 0 ? aiMessages[aiMessages.length - 1]?.model?.name ?? 'this model' : 'this model';
+});
+
 const {
   inputText,
   selectedModelIds,
   messagesContainer,
   textareaRef,
   webSearchEnabled,
+  webSearchUpgrade,
   highlightPopover,
   branchContext,
   subscription,
   canEnableWebSearch,
   canSend,
   selectedUserMessage,
+  handleWebSearchClick,
   handleModelSelect,
   addModelSlot,
   removeModelSlot,

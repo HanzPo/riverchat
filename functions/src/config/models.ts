@@ -33,12 +33,12 @@ const MODEL_DEFS: ModelDef[] = [
   { id: 'meta-llama/llama-4-scout', displayName: 'Llama 4 Scout', provider: 'Meta', category: 'budget', contextLength: 512000, orPrice: [0.08, 0.30] },
   { id: 'meta-llama/llama-4-maverick', displayName: 'Llama 4 Maverick', provider: 'Meta', category: 'budget', contextLength: 256000, orPrice: [0.15, 0.60] },
   { id: 'deepseek/deepseek-v3.2', displayName: 'DeepSeek V3.2', provider: 'DeepSeek', category: 'budget', contextLength: 128000, orPrice: [0.25, 0.40] },
-  { id: 'minimax/minimax-m2.5', displayName: 'MiniMax M2.5', provider: 'MiniMax', category: 'budget', contextLength: 128000, orPrice: [0.30, 1.10] },
+  { id: 'minimax/minimax-m2.5', displayName: 'MiniMax M2.5', provider: 'MiniMax', category: 'budget', contextLength: 196608, orPrice: [0.27, 0.95] },
 
   // Standard
   { id: 'openai/gpt-5.1-codex-mini', displayName: 'GPT-5.1 Codex Mini', provider: 'OpenAI', category: 'standard', contextLength: 200000, orPrice: [0.25, 2.00] },
   { id: 'moonshotai/kimi-k2.5', displayName: 'Kimi K2.5', provider: 'Moonshot', category: 'standard', contextLength: 128000, orPrice: [0.45, 2.20] },
-  { id: 'qwen/qwen3.5-plus', displayName: 'Qwen 3.5 Plus', provider: 'Qwen', category: 'standard', contextLength: 131072, orPrice: [0.40, 2.40] },
+  { id: 'qwen/qwen3.5-plus-02-15', displayName: 'Qwen 3.5 Plus', provider: 'Qwen', category: 'standard', contextLength: 1000000, orPrice: [0.26, 1.56] },
   { id: 'mistralai/mistral-large-2512', displayName: 'Mistral Large 3', provider: 'Mistral', category: 'standard', contextLength: 128000, orPrice: [0.50, 1.50] },
   { id: 'deepseek/deepseek-r1', displayName: 'DeepSeek R1', provider: 'DeepSeek', category: 'standard', contextLength: 128000, orPrice: [0.70, 2.50] },
   { id: 'google/gemini-3-flash-preview', displayName: 'Gemini 3 Flash', provider: 'Google', category: 'standard', contextLength: 1000000, orPrice: [0.50, 3.00] },

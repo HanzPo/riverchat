@@ -402,7 +402,7 @@ test.describe('Auth Modal', () => {
       await page.waitForTimeout(500);
 
       // Auth modal should show Google sign-in button
-      const googleBtn = page.locator('button:has-text("Sign in with Google"), button:has-text("Sign up with Google")');
+      const googleBtn = page.locator('button:has-text("Sign in with Google"), button:has-text("Sign up with Google"), button:has-text("Continue with Google")');
       await expect(googleBtn.first()).toBeVisible({ timeout: 3000 });
     }
   });
@@ -419,8 +419,8 @@ test.describe('Auth Modal', () => {
       await signInBtn.first().click();
       await page.waitForTimeout(500);
 
-      // Click Cancel or Maybe Later
-      const cancelBtn = page.locator('button:has-text("Cancel"), button:has-text("Maybe Later")');
+      // Click Cancel, Maybe Later, or Not now
+      const cancelBtn = page.locator('button:has-text("Cancel"), button:has-text("Maybe Later"), button:has-text("Not now")');
       await cancelBtn.first().click();
       await page.waitForTimeout(300);
     }
@@ -1034,7 +1034,24 @@ test.describe('Z-index Stacking', () => {
     const createBtn = page.locator('button:has-text("Create River")');
     if (await createBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
       await createBtn.click();
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(500);
+
+      // If a "Create a New River" modal appeared, fill in name and create
+      const nameInput = page.locator('input[placeholder*="river name"], input[placeholder*="Enter river name"]');
+      if (await nameInput.isVisible({ timeout: 1000 }).catch(() => false)) {
+        await nameInput.fill('Z-index Test River');
+        await page.locator('button:has-text("Create")').last().click();
+        await page.waitForTimeout(2000);
+      } else {
+        await page.waitForTimeout(2000);
+      }
+    }
+
+    // Dismiss any lingering modals before proceeding
+    const anyBackdrop = page.locator('.modal-backdrop');
+    if (await anyBackdrop.isVisible({ timeout: 500 }).catch(() => false)) {
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(500);
     }
 
     // Open rivers dashboard

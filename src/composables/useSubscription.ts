@@ -52,6 +52,11 @@ export function useSubscription() {
 
   const webSearchEnabled = computed(() => tier.value !== 'free');
 
+  // Credit warning thresholds (for free tier only — paid tiers have enough credits)
+  const isLowBalance = computed(() => tier.value === 'free' && totalBalance.value > 0 && totalBalance.value < 50);
+  const isCriticalBalance = computed(() => tier.value === 'free' && totalBalance.value > 0 && totalBalance.value < 10);
+  const isZeroBalance = computed(() => totalBalance.value <= 0);
+
   /** Refresh balance from server */
   async function refreshBalance(): Promise<void> {
     isLoadingBalance.value = true;
@@ -128,6 +133,9 @@ export function useSubscription() {
     daysUntilReset,
     maxModelsPerPrompt,
     webSearchEnabled,
+    isLowBalance,
+    isCriticalBalance,
+    isZeroBalance,
 
     // Methods
     canAccessCategory,

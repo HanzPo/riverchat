@@ -45,12 +45,11 @@
             <button
               v-for="model in modelsInCategory(cat)"
               :key="model.id"
-              @click="selectModel(model.id)"
+              @click="canAccessCategory(cat) ? selectModel(model.id) : showUpgradeForModel(model, $event)"
               class="w-full text-left px-3 py-2 flex items-center justify-between transition-colors"
               :class="canAccessCategory(cat)
                 ? 'hover:bg-white/5 cursor-pointer'
-                : 'opacity-40 cursor-not-allowed'"
-              :disabled="!canAccessCategory(cat)"
+                : 'opacity-40 cursor-pointer hover:opacity-60'"
             >
               <div class="min-w-0">
                 <div class="text-xs font-semibold truncate" :style="model.id === selectedModelId ? 'color: var(--color-primary);' : 'color: var(--color-text-primary);'">
@@ -72,6 +71,17 @@
         </template>
       </div>
     </Teleport>
+
+    <!-- Upgrade Popover for locked models -->
+    <UpgradePopover
+      :visible="upgradePopover.visible"
+      :position="upgradePopover.position"
+      :title="upgradePopover.title"
+      :description="upgradePopover.description"
+      :target-tier="upgradePopover.targetTier"
+      @close="upgradePopover.visible = false"
+      @upgrade="handleUpgrade"
+    />
   </div>
 </template>
 
@@ -80,7 +90,9 @@ import { ref, computed, watch, nextTick } from 'vue';
 import type { LLMModel, ModelCategory } from '../types';
 import { CATEGORY_ORDER, CATEGORY_LABELS, CATEGORY_MIN_TIER } from '../types';
 import { useSubscription } from '../composables/useSubscription';
+import { usePostHog } from '../composables/usePostHog';
 import { sortModels } from '../services/openrouter';
+import UpgradePopover from './UpgradePopover.vue';
 
 interface Props {
   selectedModelId: string | null;
@@ -93,12 +105,21 @@ interface Emits {
 
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
-const { canAccessCategory } = useSubscription();
+const { canAccessCategory, upgradeToTier } = useSubscription();
+const posthogAnalytics = usePostHog();
 
 const isOpen = ref(false);
 const dropdownRef = ref<HTMLElement | null>(null);
 const menuRef = ref<HTMLElement | null>(null);
 const menuStyle = ref<Record<string, string>>({});
+
+const upgradePopover = ref({
+  visible: false,
+  position: { top: 0, left: 0 },
+  title: '',
+  description: '',
+  targetTier: 'pro' as 'pro' | 'max',
+});
 
 const sortedModels = computed(() => sortModels([...props.availableModels]));
 
@@ -115,6 +136,26 @@ function modelsInCategory(cat: ModelCategory): LLMModel[] {
 function selectModel(modelId: string) {
   emit('select', modelId);
   isOpen.value = false;
+}
+
+function showUpgradeForModel(model: LLMModel, event: MouseEvent) {
+  const rect = (event.target as HTMLElement).getBoundingClientRect();
+  const targetTier = CATEGORY_MIN_TIER[model.category] as 'pro' | 'max';
+  upgradePopover.value = {
+    visible: true,
+    position: { top: rect.top, left: rect.right + 8 },
+    title: `Unlock ${model.name}`,
+    description: `${CATEGORY_LABELS[model.category]} models require a ${targetTier === 'max' ? 'Max' : 'Pro'} subscription.`,
+    targetTier,
+  };
+  isOpen.value = false;
+  posthogAnalytics.capture('upgrade_prompt_shown', { source: 'model_dropdown', model: model.id, target_tier: targetTier });
+}
+
+function handleUpgrade(tier: 'pro' | 'max') {
+  upgradePopover.value.visible = false;
+  posthogAnalytics.capture('upgrade_prompt_clicked', { source: 'model_dropdown', target_tier: tier });
+  upgradeToTier(tier);
 }
 
 watch(isOpen, async (open) => {

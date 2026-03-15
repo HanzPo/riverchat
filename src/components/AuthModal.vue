@@ -34,11 +34,29 @@
       <h2 class="text-lg font-semibold mb-1" style="color: var(--color-text-primary); letter-spacing: -0.01em;">
         {{ isAnonymous ? 'Keep your conversations' : 'Sign in' }}
       </h2>
-      <p class="text-xs mb-5" style="color: var(--color-text-secondary);">
+      <p class="text-xs mb-4" style="color: var(--color-text-secondary);">
         {{ isAnonymous
           ? 'Link Google to save your chats and credits across devices.'
           : 'Pick up right where you left off.' }}
       </p>
+
+      <!-- Data-driven benefits for anonymous users -->
+      <div v-if="isAnonymous && (props.riverCount > 0 || props.messageCount > 0)" class="mb-4 text-left">
+        <div class="flex flex-col gap-1.5">
+          <div v-if="props.riverCount > 0" class="flex items-center gap-2 text-xs" style="color: var(--color-text-secondary);">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--color-success); flex-shrink: 0;"><path d="M20 6L9 17l-5-5"/></svg>
+            <span>Save {{ props.riverCount }} conversation{{ props.riverCount > 1 ? 's' : '' }}{{ props.messageCount > 0 ? ` (${props.messageCount} messages)` : '' }}</span>
+          </div>
+          <div class="flex items-center gap-2 text-xs" style="color: var(--color-text-secondary);">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--color-success); flex-shrink: 0;"><path d="M20 6L9 17l-5-5"/></svg>
+            <span>Sync across all your devices</span>
+          </div>
+          <div class="flex items-center gap-2 text-xs" style="color: var(--color-text-secondary);">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--color-success); flex-shrink: 0;"><path d="M20 6L9 17l-5-5"/></svg>
+            <span>Unlock credit top-ups</span>
+          </div>
+        </div>
+      </div>
 
       <!-- Error Message -->
       <div
@@ -87,6 +105,8 @@ import { auth } from '../config/firebase';
 
 interface Props {
   isOpen: boolean;
+  riverCount?: number;
+  messageCount?: number;
 }
 
 interface Emits {
@@ -94,7 +114,10 @@ interface Emits {
   (e: 'authenticated'): void;
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  riverCount: 0,
+  messageCount: 0,
+});
 
 const emit = defineEmits<Emits>();
 

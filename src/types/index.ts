@@ -41,6 +41,12 @@ export interface Settings {
   selectedModelIds: string[]; // Currently selected model IDs for chat
   lastModelRefresh?: number; // Timestamp of last model list refresh
   lastVisitedRiverId?: string | null; // ID of the last visited river
+  // Onboarding tour state
+  dismissedTips?: string[]; // IDs of dismissed onboarding tooltips
+  messageCount?: number; // Total messages sent (for progressive disclosure)
+  sessionCount?: number; // Number of app sessions (for progressive disclosure)
+  firstVisitTimestamp?: number; // Epoch ms of first visit (for time-based auth prompts)
+  hasSeenMultiModelPrompt?: boolean; // Whether user has seen the multi-model CTA
 }
 
 export type NodeType = 'user' | 'ai';

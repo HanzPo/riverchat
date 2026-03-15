@@ -136,10 +136,10 @@
         <div v-if="!canSend && !isNewRootMode && path.length > 0 && selectedUserMessage" class="py-4">
           <div class="mb-2 flex items-center gap-1.5 flex-wrap">
             <button
-              @click="canEnableWebSearch ? webSearchEnabled = !webSearchEnabled : null"
+              @click="handleWebSearchClick($event)"
               class="flex items-center justify-center rounded-lg transition-all"
-              :class="{ 'hover:opacity-80': canEnableWebSearch, 'cursor-not-allowed opacity-50': !canEnableWebSearch }"
-              :style="'width: 20px; height: 20px; background: transparent; cursor: ' + (canEnableWebSearch ? 'pointer' : 'not-allowed') + ';'"
+              :class="{ 'hover:opacity-80': canEnableWebSearch, 'cursor-pointer opacity-50 hover:opacity-70': !canEnableWebSearch }"
+              :style="'width: 20px; height: 20px; background: transparent; cursor: pointer;'"
               :title="canEnableWebSearch ? (webSearchEnabled ? 'Web search enabled' : 'Web search disabled') : 'Upgrade to use web search'"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="webSearchEnabled && canEnableWebSearch ? 'color: var(--color-primary);' : 'color: var(--color-text-tertiary);'">
@@ -225,10 +225,10 @@
 
           <div class="mb-2 flex items-center gap-1.5 flex-wrap">
             <button
-              @click="canEnableWebSearch ? webSearchEnabled = !webSearchEnabled : null"
+              @click="handleWebSearchClick($event)"
               class="flex items-center justify-center rounded-lg transition-all"
-              :class="{ 'hover:opacity-80': canEnableWebSearch, 'cursor-not-allowed opacity-50': !canEnableWebSearch }"
-              :style="'width: 20px; height: 20px; background: transparent; cursor: ' + (canEnableWebSearch ? 'pointer' : 'not-allowed') + ';'"
+              :class="{ 'hover:opacity-80': canEnableWebSearch, 'cursor-pointer opacity-50 hover:opacity-70': !canEnableWebSearch }"
+              :style="'width: 20px; height: 20px; background: transparent; cursor: pointer;'"
               :title="canEnableWebSearch ? (webSearchEnabled ? 'Web search enabled' : 'Web search disabled') : 'Upgrade to use web search'"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="webSearchEnabled && canEnableWebSearch ? 'color: var(--color-primary);' : 'color: var(--color-text-tertiary);'">
@@ -300,6 +300,17 @@
         @branch="handleSetBranchContext"
       />
     </Teleport>
+
+    <!-- Web Search Upgrade Popover -->
+    <UpgradePopover
+      :visible="webSearchUpgrade.visible"
+      :position="webSearchUpgrade.position"
+      title="Web search"
+      description="Search the web during AI responses for up-to-date information."
+      target-tier="pro"
+      @close="webSearchUpgrade.visible = false"
+      @upgrade="(tier: 'pro' | 'max') => { webSearchUpgrade.visible = false; chatModalAnalytics.capture('upgrade_prompt_clicked', { source: 'web_search', target_tier: tier }); subscription.upgradeToTier(tier); }"
+    />
   </div>
 </template>
 
@@ -310,7 +321,11 @@ import { User, Bot, GitBranch, AlertTriangle, X } from 'lucide-vue-next';
 import { renderMarkdown, formatTime, getBranchCount } from '../utils/chat';
 import TextHighlightPopover from './TextHighlightPopover.vue';
 import ModelDropdown from './ModelDropdown.vue';
+import UpgradePopover from './UpgradePopover.vue';
 import { useChatPanel } from '../composables/useChatPanel';
+import { usePostHog } from '../composables/usePostHog';
+
+const chatModalAnalytics = usePostHog();
 import type { User as FirebaseUser } from 'firebase/auth';
 
 interface Props {
@@ -342,12 +357,14 @@ const {
   messagesContainer,
   textareaRef,
   webSearchEnabled,
+  webSearchUpgrade,
   highlightPopover,
   branchContext,
   subscription,
   canEnableWebSearch,
   canSend,
   selectedUserMessage,
+  handleWebSearchClick,
   handleModelSelect,
   addModelSlot,
   removeModelSlot,

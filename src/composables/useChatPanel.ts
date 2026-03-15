@@ -42,6 +42,12 @@ export function useChatPanel(
   const textareaRef = ref<HTMLTextAreaElement | null>(null);
   const webSearchEnabled = ref(false);
 
+  // Web search upgrade popover state
+  const webSearchUpgrade = ref({
+    visible: false,
+    position: { top: 0, left: 0 },
+  });
+
   const subscription = useSubscription();
 
   const canEnableWebSearch = computed(() => {
@@ -109,6 +115,18 @@ export function useChatPanel(
       webSearchEnabled.value = false;
     }
   });
+
+  function handleWebSearchClick(event: MouseEvent) {
+    if (canEnableWebSearch.value) {
+      webSearchEnabled.value = !webSearchEnabled.value;
+    } else {
+      const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+      webSearchUpgrade.value = {
+        visible: true,
+        position: { top: rect.bottom + 4, left: rect.left },
+      };
+    }
+  }
 
   function handleModelSelect(index: number, modelId: string) {
     if (selectedModelIds.value.some((id, i) => id === modelId && i !== index)) return;
@@ -300,6 +318,7 @@ export function useChatPanel(
     messagesContainer,
     textareaRef,
     webSearchEnabled,
+    webSearchUpgrade,
     highlightPopover,
     branchContext,
     subscription,
@@ -310,6 +329,7 @@ export function useChatPanel(
     selectedUserMessage,
 
     // Methods
+    handleWebSearchClick,
     handleModelSelect,
     addModelSlot,
     removeModelSlot,
