@@ -3,21 +3,28 @@
     <transition name="tooltip-fade">
       <div
         v-if="visible && tip"
-        class="fixed z-[90] flex items-start gap-2.5 px-4 py-3 rounded-lg shadow-xl max-w-xs animate-fade-in"
-        :style="{ top: y + 'px', left: x + 'px', background: 'var(--color-background)', border: '1px solid var(--color-primary)', boxShadow: '0 0 12px rgba(13, 153, 255, 0.15)' }"
+        class="fixed z-[500] flex flex-col gap-2 px-4 py-3 rounded-lg shadow-xl max-w-xs animate-fade-in"
+        style="top: 120px; left: 24px; background: var(--color-background); border: 1px solid var(--color-primary); box-shadow: 0 0 12px rgba(13, 153, 255, 0.15);"
       >
-        <div class="flex-1">
-          <p class="text-xs font-medium leading-relaxed" style="color: var(--color-text-primary);">
+        <div class="flex items-start gap-2.5">
+          <p class="flex-1 text-xs font-medium leading-relaxed" style="color: var(--color-text-primary);">
             {{ tip.message }}
           </p>
+          <button
+            @click="$emit('dismiss', tip.id)"
+            class="shrink-0 p-1 -m-1 rounded hover:bg-white/10 opacity-60 hover:opacity-100 transition-all"
+            style="color: var(--color-text-secondary);"
+            title="Dismiss"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
         </div>
         <button
-          @click="$emit('dismiss', tip.id)"
-          class="shrink-0 mt-0.5 opacity-50 hover:opacity-100 transition-opacity"
+          @click="$emit('dismiss-all')"
+          class="self-start text-[11px] opacity-40 hover:opacity-70 transition-opacity"
           style="color: var(--color-text-secondary);"
-          title="Got it"
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          Don't show tips
         </button>
       </div>
     </transition>
@@ -30,12 +37,11 @@ import type { TourTip } from '../composables/useOnboardingTour';
 defineProps<{
   visible: boolean;
   tip: TourTip | null;
-  x: number;
-  y: number;
 }>();
 
 defineEmits<{
   (e: 'dismiss', tipId: string): void;
+  (e: 'dismiss-all'): void;
 }>();
 </script>
 

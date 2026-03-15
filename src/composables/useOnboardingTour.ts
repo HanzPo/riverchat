@@ -100,6 +100,11 @@ export function useOnboardingTour() {
     }
   }
 
+  /** Dismiss all tips at once */
+  function dismissAll() {
+    dismissedTips.value = TOUR_TIPS.map(tip => tip.id);
+  }
+
   /** Whether all tips have been completed */
   const tourComplete = computed(() =>
     TOUR_TIPS.every(tip => dismissedTips.value.includes(tip.id))
@@ -114,5 +119,6 @@ export function useOnboardingTour() {
     recordMessage,
     recordAIResponse,
     dismissTip,
+    dismissAll,
   };
 }

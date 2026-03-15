@@ -134,9 +134,8 @@
     <OnboardingTooltip
       :visible="!!tour.activeTip.value && !showSettings && !showWelcome && !showOnboarding"
       :tip="tour.activeTip.value"
-      :x="tooltipPosition.x"
-      :y="tooltipPosition.y"
       @dismiss="handleDismissTip"
+      @dismiss-all="handleDismissAllTips"
     />
 
     <!-- Auth Prompt Banner -->
@@ -386,7 +385,6 @@ const onboardingVariant = ref<string>('control');
 
 // Onboarding tour
 const tour = useOnboardingTour();
-const tooltipPosition = ref({ x: 60, y: 60 });
 
 // Auth prompt state
 const authPromptMessage = ref('');
@@ -684,6 +682,11 @@ async function handleFirstMessage(content: string) {
 // Onboarding tour: dismiss tooltip and persist
 function handleDismissTip(tipId: string) {
   tour.dismissTip(tipId);
+  updateSettings({ ...settings.value, ...tour.getSettingsUpdate() });
+}
+
+function handleDismissAllTips() {
+  tour.dismissAll();
   updateSettings({ ...settings.value, ...tour.getSettingsUpdate() });
 }
 
