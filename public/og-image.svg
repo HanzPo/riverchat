@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#080810"/>
+      <stop offset="50%" style="stop-color:#0f1020"/>
+      <stop offset="100%" style="stop-color:#0a0a18"/>
+    </linearGradient>
+    <linearGradient id="river1" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:0.9"/>
+      <stop offset="50%" style="stop-color:#60a5fa;stop-opacity:0.7"/>
+      <stop offset="100%" style="stop-color:#93c5fd;stop-opacity:0.3"/>
+    </linearGradient>
+    <linearGradient id="river2" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#8b5cf6;stop-opacity:0.8"/>
+      <stop offset="50%" style="stop-color:#a78bfa;stop-opacity:0.6"/>
+      <stop offset="100%" style="stop-color:#c4b5fd;stop-opacity:0.25"/>
+    </linearGradient>
+    <linearGradient id="river3" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#06b6d4;stop-opacity:0.7"/>
+      <stop offset="50%" style="stop-color:#22d3ee;stop-opacity:0.5"/>
+      <stop offset="100%" style="stop-color:#67e8f9;stop-opacity:0.2"/>
+    </linearGradient>
+    <linearGradient id="river4" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#10b981;stop-opacity:0.6"/>
+      <stop offset="50%" style="stop-color:#34d399;stop-opacity:0.4"/>
+      <stop offset="100%" style="stop-color:#6ee7b7;stop-opacity:0.15"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="nodeGlow">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- Subtle grid pattern -->
+  <g opacity="0.03" stroke="#ffffff" stroke-width="0.5">
+    <line x1="0" y1="0" x2="0" y2="630" /><line x1="60" y1="0" x2="60" y2="630" />
+    <line x1="120" y1="0" x2="120" y2="630" /><line x1="180" y1="0" x2="180" y2="630" />
+    <line x1="240" y1="0" x2="240" y2="630" /><line x1="300" y1="0" x2="300" y2="630" />
+    <line x1="360" y1="0" x2="360" y2="630" /><line x1="420" y1="0" x2="420" y2="630" />
+    <line x1="480" y1="0" x2="480" y2="630" /><line x1="540" y1="0" x2="540" y2="630" />
+    <line x1="600" y1="0" x2="600" y2="630" /><line x1="660" y1="0" x2="660" y2="630" />
+    <line x1="720" y1="0" x2="720" y2="630" /><line x1="780" y1="0" x2="780" y2="630" />
+    <line x1="840" y1="0" x2="840" y2="630" /><line x1="900" y1="0" x2="900" y2="630" />
+    <line x1="960" y1="0" x2="960" y2="630" /><line x1="1020" y1="0" x2="1020" y2="630" />
+    <line x1="1080" y1="0" x2="1080" y2="630" /><line x1="1140" y1="0" x2="1140" y2="630" />
+    <line x1="0" y1="63" x2="1200" y2="63" /><line x1="0" y1="126" x2="1200" y2="126" />
+    <line x1="0" y1="189" x2="1200" y2="189" /><line x1="0" y1="252" x2="1200" y2="252" />
+    <line x1="0" y1="315" x2="1200" y2="315" /><line x1="0" y1="378" x2="1200" y2="378" />
+    <line x1="0" y1="441" x2="1200" y2="441" /><line x1="0" y1="504" x2="1200" y2="504" />
+    <line x1="0" y1="567" x2="1200" y2="567" />
+  </g>
+
+  <!-- River paths - bottom area, not overlapping text -->
+  <g filter="url(#glow)">
+    <!-- Main trunk -->
+    <path d="M-20,520 C100,520 150,510 280,500" stroke="url(#river1)" stroke-width="3.5" fill="none"/>
+    <!-- Branch 1 - up -->
+    <path d="M280,500 C400,490 500,450 650,420 C800,390 900,370 1220,340" stroke="url(#river1)" stroke-width="3" fill="none"/>
+    <!-- Branch 2 - down -->
+    <path d="M280,500 C400,510 500,540 650,560 C800,580 900,590 1220,595" stroke="url(#river2)" stroke-width="3" fill="none"/>
+    <!-- Branch 3 - middle -->
+    <path d="M280,500 C400,500 500,490 650,480 C800,470 950,475 1220,480" stroke="url(#river3)" stroke-width="2.5" fill="none"/>
+    <!-- Sub-branch from branch 1 -->
+    <path d="M650,420 C750,415 800,390 950,370 C1050,355 1100,350 1220,340" stroke="url(#river4)" stroke-width="2" fill="none" opacity="0.7"/>
+    <path d="M650,420 C750,425 800,440 950,450 C1050,458 1100,460 1220,460" stroke="url(#river1)" stroke-width="2" fill="none" opacity="0.5"/>
+  </g>
+
+  <!-- Branch nodes -->
+  <g filter="url(#nodeGlow)">
+    <circle cx="280" cy="500" r="7" fill="#3b82f6" opacity="0.9"/>
+    <circle cx="650" cy="420" r="5.5" fill="#60a5fa" opacity="0.8"/>
+    <circle cx="650" cy="560" r="5.5" fill="#a78bfa" opacity="0.7"/>
+    <circle cx="650" cy="480" r="5" fill="#22d3ee" opacity="0.7"/>
+  </g>
+
+  <!-- Title -->
+  <text x="600" y="210" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif" font-size="80" font-weight="700" fill="#ffffff" letter-spacing="-2">RiverChat</text>
+
+  <!-- Tagline -->
+  <text x="600" y="280" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif" font-size="30" fill="#94a3b8" font-weight="400" letter-spacing="0.5">Branching AI Conversations</text>
+
+  <!-- Feature pills -->
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif" font-size="16" font-weight="400">
+    <!-- Pill 1 -->
+    <rect x="280" y="340" width="170" height="36" rx="18" fill="#3b82f6" fill-opacity="0.12" stroke="#3b82f6" stroke-opacity="0.3" stroke-width="1"/>
+    <text x="365" y="363" text-anchor="middle" fill="#93c5fd">Multiple Models</text>
+    <!-- Pill 2 -->
+    <rect x="470" y="340" width="190" height="36" rx="18" fill="#8b5cf6" fill-opacity="0.12" stroke="#8b5cf6" stroke-opacity="0.3" stroke-width="1"/>
+    <text x="565" y="363" text-anchor="middle" fill="#c4b5fd">Branching Threads</text>
+    <!-- Pill 3 -->
+    <rect x="680" y="340" width="200" height="36" rx="18" fill="#06b6d4" fill-opacity="0.12" stroke="#06b6d4" stroke-opacity="0.3" stroke-width="1"/>
+    <text x="780" y="363" text-anchor="middle" fill="#67e8f9">Visual Graph View</text>
+  </g>
+
+  <!-- URL -->
+  <text x="600" y="610" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif" font-size="16" fill="#475569" font-weight="400" letter-spacing="1">riverchat.app</text>
+</svg>
