@@ -443,9 +443,9 @@ const totalMessageCount = computed(() => {
 // Update page title when river changes
 watch(currentRiver, (river) => {
   if (river) {
-    document.title = `RiverChat - ${river.name}`;
+    document.title = `${river.name} - RiverChat`;
   } else {
-    document.title = 'RiverChat | Branching AI Conversations';
+    document.title = 'RiverChat - Branching AI Conversations | Chat with Multiple AI Models';
   }
 }, { immediate: true });
 
